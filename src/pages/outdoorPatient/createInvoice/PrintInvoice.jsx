@@ -102,41 +102,42 @@ const isNetworkError = (err) => err?.isAxiosError === true && !err.response;
 
 const pdf$ = StyleSheet.create({
   page: { backgroundColor: "#ffffff", fontFamily: "Helvetica", fontSize: 9, color: "#111827" },
-  // header
+  // header — white bg, black text
   header: {
-    backgroundColor: "#2563eb",
+    backgroundColor: "#ffffff",
+    borderBottom: "1.5 solid #e5e7eb",
     padding: "16 20",
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "flex-start",
   },
-  headerLeft: { flex: 1 },
+  headerLeft: { flex: 1, marginRight: 10 },
   logoRow: { flexDirection: "row", alignItems: "center", marginBottom: 6 },
   logoBox: {
-    width: 28,
-    height: 28,
-    backgroundColor: "rgba(255,255,255,0.25)",
+    width: 26,
+    height: 26,
+    backgroundColor: "#2563eb",
     borderRadius: 6,
     alignItems: "center",
     justifyContent: "center",
     marginRight: 8,
   },
-  logoText: { color: "#ffffff", fontFamily: "Helvetica-Bold", fontSize: 11 },
-  labName: { color: "#ffffff", fontFamily: "Helvetica-Bold", fontSize: 13 },
-  poweredBy: { color: "#bfdbfe", fontSize: 6.5, marginTop: 1 },
-  labSub: { color: "#bfdbfe", fontSize: 8 },
-  headerMeta: { color: "#dbeafe", fontSize: 7.5, marginTop: 2 },
+  logoText: { color: "#ffffff", fontFamily: "Helvetica-Bold", fontSize: 10 },
+  labName: { color: "#111827", fontFamily: "Helvetica-Bold", fontSize: 10, maxWidth: 220 },
+  poweredBy: { color: "#6b7280", fontSize: 6.5, marginTop: 1 },
+  labSub: { color: "#6b7280", fontSize: 8 },
+  headerMeta: { color: "#374151", fontSize: 7.5, marginTop: 2 },
   headerRight: { alignItems: "flex-end" },
   invoiceBadge: {
-    backgroundColor: "rgba(255,255,255,0.2)",
+    backgroundColor: "#f3f4f6",
     borderRadius: 6,
     padding: "4 10",
     alignItems: "center",
     marginBottom: 6,
   },
-  invoiceLabel: { color: "#bfdbfe", fontSize: 7, textTransform: "uppercase", letterSpacing: 0.5 },
-  invoiceId: { color: "#ffffff", fontFamily: "Helvetica-Bold", fontSize: 13 },
-  dateText: { color: "#dbeafe", fontSize: 7.5 },
+  invoiceLabel: { color: "#6b7280", fontSize: 7, textTransform: "uppercase", letterSpacing: 0.5 },
+  invoiceId: { color: "#111827", fontFamily: "Helvetica-Bold", fontSize: 12 },
+  dateText: { color: "#374151", fontSize: 7.5 },
   // sections
   section: { padding: "12 20", borderBottom: "1 solid #e5e7eb" },
   sectionLast: { padding: "12 20" },
@@ -185,7 +186,6 @@ const pdf$ = StyleSheet.create({
   pricingLabel: { fontSize: 8, color: "#6b7280" },
   pricingValue: { fontSize: 8, fontFamily: "Helvetica-Bold", color: "#111827" },
   pricingNeg: { fontSize: 8, color: "#dc2626" },
-  // FIX: was referenced (pdf$.pricingFee) but never defined — invoice fee row rendered unstyled.
   pricingFee: { fontSize: 8, fontFamily: "Helvetica-Bold", color: "#2563eb" },
   pricingPaid: { fontSize: 8, fontFamily: "Helvetica-Bold", color: "#16a34a" },
   pricingDue: { fontSize: 8, fontFamily: "Helvetica-Bold", color: "#dc2626" },
@@ -235,8 +235,8 @@ const InvoicePDF = ({ invoice, qrCodeUrl, date, time, labInfo }) => {
           </View>
           <View style={pdf$.headerRight}>
             <View style={pdf$.invoiceBadge}>
-              <Text style={pdf$.invoiceLabel}>Invoice</Text>
-              <Text style={pdf$.invoiceId}>#{invoiceId || "N/A"}</Text>
+              <Text style={pdf$.invoiceLabel}>Invoice ID</Text>
+              <Text style={pdf$.invoiceId}>{invoiceId || "N/A"}</Text>
             </View>
             <Text style={pdf$.dateText}>Date: {date}</Text>
             <Text style={pdf$.dateText}>Time: {time}</Text>
@@ -383,20 +383,22 @@ const InvoiceCard = ({ invoice, qrCodeUrl, date, time, labInfo }) => {
 
   return (
     <div className="bg-white shadow-lg rounded-xl overflow-hidden">
-      {/* Header */}
-      <div className="bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-5">
+      {/* Header — white bg, black text */}
+      <div className="bg-white border-b border-gray-200 px-6 py-5">
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
             <div className="flex items-center gap-3 mb-2">
-              <div className="w-10 h-10 shrink-0 bg-white/20 rounded-xl flex items-center justify-center">
+              <div className="w-9 h-9 shrink-0 bg-blue-600 rounded-xl flex items-center justify-center">
                 <span className="text-white font-bold text-sm">LP</span>
               </div>
               <div className="min-w-0">
-                <h1 className="text-lg font-bold text-white leading-tight">{labInfo.name}</h1>
-                <p className="text-blue-100 text-[10px] leading-tight">Powered by LabPilot Pro</p>
+                <h1 className="text-base font-bold text-gray-900 leading-tight truncate max-w-[220px]">
+                  {labInfo.name}
+                </h1>
+                <p className="text-gray-500 text-[10px] leading-tight">Powered by LabPilot Pro</p>
               </div>
             </div>
-            <div className="mt-2 space-y-1 text-blue-50 text-xs">
+            <div className="mt-2 space-y-1 text-gray-600 text-xs">
               <div className="flex items-start gap-1.5">
                 <MapPin className="w-3 h-3 shrink-0 mt-0.5" />
                 <span>{labInfo.address}</span>
@@ -414,11 +416,11 @@ const InvoiceCard = ({ invoice, qrCodeUrl, date, time, labInfo }) => {
             </div>
           </div>
           <div className="text-right shrink-0">
-            <div className="inline-block bg-white/20 px-3 py-1.5 rounded-lg">
-              <p className="text-blue-100 text-[10px] uppercase tracking-wide font-medium">Invoice</p>
-              <p className="text-white text-lg font-bold">#{invoiceId || "N/A"}</p>
+            <div className="inline-block bg-gray-100 px-3 py-1.5 rounded-lg">
+              <p className="text-gray-500 text-[10px] uppercase tracking-wide font-medium">Invoice ID</p>
+              <p className="text-gray-900 text-lg font-bold">{invoiceId || "N/A"}</p>
             </div>
-            <div className="mt-2 text-blue-50 text-xs space-y-0.5">
+            <div className="mt-2 text-gray-600 text-xs space-y-0.5">
               <p>Date: {date}</p>
               <p>Time: {time}</p>
             </div>
@@ -520,7 +522,6 @@ const InvoiceCard = ({ invoice, qrCodeUrl, date, time, labInfo }) => {
             {flags.showLabAdjustment && (
               <PricingRow label="Lab Adjustment" value={`- ${fmt(amount.labAdjustment)}`} valueClass="text-red-600" />
             )}
-            {/* FIX: invoice fee row was missing on the screen version entirely */}
             {flags.showInvoiceFee && (
               <PricingRow
                 label="Online Report Fee"
