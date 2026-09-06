@@ -336,7 +336,7 @@ const InvoiceSummary = ({ formData, amount, onConfirm, onClose }) => {
             )}
             {effectiveReferrer && (
               <div className="col-span-2">
-                <p className="text-gray-500">Media (কমিশন ভোগকারী)</p>
+                <p className="text-gray-500">Media - কমিশন ভোগকারী</p>
                 <p className="font-medium text-gray-900">
                   {typeof effectiveReferrer === "object" ? effectiveReferrer.name : effectiveReferrer}
                   {useDoctorAsReferrer && <span className="text-xs text-gray-400 ml-1">(Doctor)</span>}
@@ -789,7 +789,7 @@ const InvoiceForm = ({
           </div>
 
           <div className="md:col-span-2">
-            <Field label="Media(কমিশন ভোগকারী)" optional>
+            <Field label="Media - কমিশন ভোগকারী" optional>
               <div className="relative">
                 <div className="relative">
                   <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 z-10" />
