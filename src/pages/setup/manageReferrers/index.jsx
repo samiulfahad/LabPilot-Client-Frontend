@@ -150,7 +150,7 @@ const ReferrerFormModal = ({ formData, onChange, onSubmit, onClose, saving, apiE
                 {isEdit ? "তথ্য সম্পাদনা" : "নতুন নিবন্ধন"}
               </p>
               <p className="font-['IBM_Plex_Sans',sans-serif] text-base font-bold text-[#0F172A]">
-                {isEdit ? "রেফারার সম্পাদনা" : "রেফারার নিবন্ধন"}
+                {isEdit ? "মিডিয়া সম্পাদনা" : "মিডিয়া নিবন্ধন"}
               </p>
             </div>
           </div>
@@ -255,7 +255,7 @@ const ReferrerFormModal = ({ formData, onChange, onSubmit, onClose, saving, apiE
                   {[
                     {
                       type: "percentage",
-                      label: "শতাংশ (%)",
+                      label: "পারসেন্টেজ (%)",
                       Icon: BadgePercent,
                       bg: "bg-[#F59E0B12]",
                       border: "border-[#F59E0B60]",
@@ -447,7 +447,7 @@ const CommissionModal = ({ referrer, onClose, onSaved }) => {
                 {[
                   {
                     type: "percentage",
-                    label: "শতাংশ (%)",
+                    label: "পারসেন্টেজ (%)",
                     Icon: BadgePercent,
                     bg: "bg-[#F59E0B12]",
                     border: "border-[#F59E0B60]",
@@ -956,10 +956,9 @@ const ManageReferrer = () => {
             </div>
             <div>
               <h1 className="font-['IBM_Plex_Sans',sans-serif] text-[22px] font-bold text-[#0F172A] leading-tight">
-                রেফারার তালিকা
+                মিডিয়া তালিকা
               </h1>
               <p className="text-[13px] text-[#64748B] mt-0.5">
-                রেফারেল ও কমিশন পরিচালনা।
                 {maxReferrer !== null && (
                   <span
                     className="ml-1.5 font-['IBM_Plex_Mono',monospace]"
@@ -986,7 +985,7 @@ const ManageReferrer = () => {
               style={{ background: atReferrerLimit ? "#94A3B8" : "linear-gradient(135deg,#6366F1,#4F46E5)" }}
             >
               {atReferrerLimit ? <Lock className="w-[13px] h-[13px]" /> : <UserPlus className="w-[13px] h-[13px]" />}
-              New Referrer
+              New Media
             </button>
           </div>
         </div>

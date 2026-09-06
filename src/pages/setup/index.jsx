@@ -28,8 +28,8 @@ const CARDS = [
     permission: "manageStaffs",
   },
   {
-    title: "রোগী রেফারার",
-    subtitle: "রেফারারদের তালিকা ও কমিশন",
+    title: "রোগী প্রেরণকারী মিডিয়া",
+    subtitle: "মিডিয়া তালিকা ও কমিশন",
     icon: UserCheck,
     link: "/manage-referrers",
     color: "purple",

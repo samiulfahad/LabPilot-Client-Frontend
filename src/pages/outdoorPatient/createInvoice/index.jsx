@@ -336,7 +336,7 @@ const InvoiceSummary = ({ formData, amount, onConfirm, onClose }) => {
             )}
             {effectiveReferrer && (
               <div className="col-span-2">
-                <p className="text-gray-500">Referred By</p>
+                <p className="text-gray-500">Media (কমিশন ভোগকারী)</p>
                 <p className="font-medium text-gray-900">
                   {typeof effectiveReferrer === "object" ? effectiveReferrer.name : effectiveReferrer}
                   {useDoctorAsReferrer && <span className="text-xs text-gray-400 ml-1">(Doctor)</span>}
@@ -782,7 +782,7 @@ const InvoiceForm = ({
                 checked={useDoctorAsReferrer}
                 onChange={(val) => onChange("useDoctorAsReferrer", val)}
                 icon={UserCircle}
-                label="Use Doctor as Referrer"
+                label="ডাক্তারকে Media হিসাবে ব্যবহার করুন "
                 disabled={!doctor}
               />
             </div>
