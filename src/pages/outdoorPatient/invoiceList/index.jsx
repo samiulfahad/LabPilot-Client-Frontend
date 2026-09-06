@@ -7,7 +7,6 @@ import {
   FileText,
   CheckCircle2,
   ArrowLeft,
-  Plus,
   Wallet,
   AlertCircle,
   PackageCheck,
@@ -18,6 +17,7 @@ import {
   Phone,
   Calendar,
   ChevronDown,
+  ChevronUp,
   X,
   Eye,
   UserCircle,
@@ -31,6 +31,8 @@ import {
   Check,
   CreditCard,
   Loader2,
+  Search,
+  MoreHorizontal,
 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import Popup from "../../../components/popup";
@@ -63,6 +65,12 @@ const formatDateTime = (ts) => {
     date: `${day}${suffix} ${d.toLocaleString("default", { month: "short" })}, ${d.getFullYear()}`,
     time: `${h % 12 === 0 ? 12 : h % 12}:${String(d.getMinutes()).padStart(2, "0")} ${h >= 12 ? "PM" : "AM"}`,
   };
+};
+
+// Compact "relative-ish" line used on cards: "7th Sep, 2026 · 4:32 PM"
+const formatDateTimeLine = (ts) => {
+  const { date, time } = formatDateTime(ts);
+  return `${date} · ${time}`;
 };
 
 const getDue = (inv) => Math.max(0, (inv.amount?.final ?? 0) - (inv.amount?.paid ?? 0));
@@ -110,9 +118,6 @@ const getErrorMessage = (err, fallback) => {
 // ── Axios‑native network error detection (same as all other pages) ──────────
 const isNetworkError = (err) => err?.isAxiosError === true && !err.response;
 
-const SEAL_BLUE = "#1E4FA0";
-const SEAL_RED = "#C0312B";
-
 // ─── Payment modes (mirrors CreateInvoice.jsx / SearchInvoice.jsx) ───────────
 
 const PAYMENT_MODES = [
@@ -139,7 +144,7 @@ const CopyIdButton = ({ value, size = "xs" }) => {
     }
   };
 
-  const dims = size === "sm" ? "w-5 h-5" : "w-4 h-4";
+  const dims = size === "sm" ? "w-6 h-6" : "w-5 h-5";
   const iconDims = size === "sm" ? "w-3 h-3" : "w-2.5 h-2.5";
 
   return (
@@ -148,47 +153,14 @@ const CopyIdButton = ({ value, size = "xs" }) => {
       onClick={handleCopy}
       title={copied ? "কপি হয়েছে" : "আইডি কপি করুন"}
       aria-label="Copy invoice ID"
-      className={`relative shrink-0 ${dims} flex items-center justify-center rounded-[2px] text-[#A8ACA3] hover:text-[#1E4FA0] hover:bg-[#1E4FA0]/5 transition-colors`}
+      className={`relative shrink-0 ${dims} flex items-center justify-center rounded-md text-slate-400 hover:text-blue-600 hover:bg-blue-50 active:scale-95 transition-all`}
     >
-      {copied ? <Check className={`${iconDims} text-[#0F6E5C]`} /> : <Copy className={iconDims} />}
+      {copied ? <Check className={`${iconDims} text-emerald-600`} /> : <Copy className={iconDims} />}
     </button>
   );
 };
 
-// ─── Round Seal ───────────────────────────────────────────────────────────────
-
-const RoundSeal = ({ dateLabel }) => (
-  <div className="relative shrink-0 select-none rotate-[-3deg]">
-    <div
-      className="bg-white px-4 py-2.5 rounded-[3px]"
-      style={{ border: `2px solid ${SEAL_BLUE}`, boxShadow: `inset 0 0 0 3px ${SEAL_BLUE}05` }}
-    >
-      <div className="border" style={{ borderColor: `${SEAL_BLUE}55`, padding: "5px 10px" }}>
-        <p
-          className="text-center font-['IBM_Plex_Mono'] font-bold uppercase"
-          style={{ color: SEAL_BLUE, fontSize: "10px", letterSpacing: "2px" }}
-        >
-          LabPilotPro.com
-        </p>
-        <div className="h-px w-full my-1" style={{ backgroundColor: `${SEAL_BLUE}55` }} />
-        <p
-          className="text-center font-['IBM_Plex_Mono'] font-extrabold uppercase"
-          style={{ color: SEAL_RED, fontSize: "13px", letterSpacing: "1.5px" }}
-        >
-          ইনভয়েস
-        </p>
-        <p
-          className="text-center font-['IBM_Plex_Mono'] font-semibold"
-          style={{ color: SEAL_RED, fontSize: "11px", letterSpacing: "0.5px" }}
-        >
-          {dateLabel}
-        </p>
-      </div>
-    </div>
-  </div>
-);
-
-// ─── Collect Due Modal (ledger-styled) ────────────────────────────────────────
+// ─── Collect Due Modal ────────────────────────────────────────────────────────
 
 const CollectDueModal = ({ invoice, isOpen, onClose, onConfirm, onNetworkError }) => {
   const due = invoice ? getDue(invoice) : 0;
@@ -242,14 +214,14 @@ const CollectDueModal = ({ invoice, isOpen, onClose, onConfirm, onNetworkError }
 
   return (
     <Modal isOpen={isOpen} onClose={submitting ? undefined : onClose} size="sm">
-      <div className="flex items-center justify-between px-5 pt-5 pb-4 border-b border-[#E3E0D6] bg-[#FAF9F5]">
+      <div className="flex items-center justify-between px-5 pt-5 pb-4 border-b border-slate-100">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-[3px] border border-[#0F6E5C]/30 flex items-center justify-center shrink-0 bg-white">
-            <Banknote className="w-4 h-4 text-[#0F6E5C]" />
+          <div className="w-9 h-9 rounded-xl bg-emerald-50 flex items-center justify-center shrink-0">
+            <Banknote className="w-4 h-4 text-emerald-600" />
           </div>
           <div>
-            <h2 className="font-['IBM_Plex_Sans'] text-sm font-bold text-[#1C1F1E] leading-tight">বকেয়া আদায়</h2>
-            <p className="font-['IBM_Plex_Mono'] text-[10px] text-[#A8ACA3] mt-0.5">
+            <h2 className="text-sm font-bold text-slate-900 leading-tight">বকেয়া আদায়</h2>
+            <p className="text-xs text-slate-400 mt-0.5">
               #{invoice.invoiceId} · {invoice.patient?.name}
             </p>
           </div>
@@ -257,7 +229,7 @@ const CollectDueModal = ({ invoice, isOpen, onClose, onConfirm, onNetworkError }
         {!submitting && (
           <button
             onClick={onClose}
-            className="w-7 h-7 flex items-center justify-center rounded-sm text-[#A8ACA3] hover:text-[#1C1F1E] hover:bg-[#EDEBE3] transition-colors"
+            className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-400 hover:text-slate-900 hover:bg-slate-100 transition-colors"
           >
             <X className="w-4 h-4" />
           </button>
@@ -265,48 +237,41 @@ const CollectDueModal = ({ invoice, isOpen, onClose, onConfirm, onNetworkError }
       </div>
 
       <div className="px-5 py-5 space-y-4">
-        {/* Total due */}
-        <div className="flex items-center justify-between p-3 rounded-[3px] border border-[#C0312B]/25 bg-[#C0312B]/5">
-          <span className="font-['IBM_Plex_Mono'] text-[10px] uppercase text-[#C0312B]">মোট বাকি</span>
-          <span className="font-['IBM_Plex_Mono'] text-base font-bold text-[#C0312B] tabular-nums">{fmt(due)}</span>
+        <div className="flex items-center justify-between p-3.5 rounded-xl border border-red-100 bg-red-50">
+          <span className="text-xs font-medium uppercase tracking-wide text-red-600">মোট বাকি</span>
+          <span className="text-lg font-bold text-red-600 tabular-nums">{fmt(due)}</span>
         </div>
 
-        {/* Amount */}
         <div>
-          <label className="block font-['IBM_Plex_Mono'] text-[10px] uppercase text-[#6F756F] mb-1.5">
-            আদায়কৃত পরিমাণ
-          </label>
+          <label className="block text-xs font-medium text-slate-500 mb-1.5">আদায়কৃত পরিমাণ</label>
           <div className="relative">
-            <Wallet className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[#A8ACA3] pointer-events-none" />
+            <Wallet className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
             <input
               type="number"
+              inputMode="decimal"
               value={amount}
               onChange={(e) => clampAmount(e.target.value)}
               min="0"
               max={due}
               step="0.01"
               disabled={submitting}
-              className="w-full pl-9 pr-3 py-2.5 text-sm border border-[#D8D5CB] rounded-[2px] focus:outline-none focus:ring-1 focus:ring-[#0F6E5C]/30 focus:border-[#0F6E5C] transition-all placeholder-[#A8ACA3] bg-[#FAF9F5] focus:bg-white font-['IBM_Plex_Mono'] disabled:opacity-60"
+              className="w-full pl-10 pr-3 py-3 text-base border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all bg-slate-50 focus:bg-white disabled:opacity-60"
             />
           </div>
-          <div className="flex items-center justify-between mt-1.5">
+          <div className="flex items-center justify-between mt-2 gap-2">
             <button
               type="button"
               onClick={() => setAmount(due)}
               disabled={submitting}
-              className="font-['IBM_Plex_Mono'] text-[10px] uppercase text-[#0F6E5C] hover:underline"
+              className="text-xs font-medium text-emerald-600 hover:underline"
             >
               সম্পূর্ণ বাকি আদায় করুন ({fmt(due)})
             </button>
-            <span className="font-['IBM_Plex_Mono'] text-[10px] text-[#A8ACA3]">সর্বোচ্চ {fmt(due)}</span>
           </div>
         </div>
 
-        {/* Payment mode */}
         <div>
-          <label className="block font-['IBM_Plex_Mono'] text-[10px] uppercase text-[#6F756F] mb-1.5">
-            পেমেন্ট মাধ্যম
-          </label>
+          <label className="block text-xs font-medium text-slate-500 mb-1.5">পেমেন্ট মাধ্যম</label>
           <div className="flex flex-wrap gap-1.5">
             {PAYMENT_MODES.map((mode) => (
               <button
@@ -315,10 +280,10 @@ const CollectDueModal = ({ invoice, isOpen, onClose, onConfirm, onNetworkError }
                 disabled={submitting}
                 onClick={() => setPaymentMode(mode.value)}
                 aria-pressed={paymentMode === mode.value}
-                className={`px-3 py-1.5 rounded-[2px] font-['IBM_Plex_Mono'] text-[11px] uppercase tracking-wide border transition-colors disabled:opacity-50 ${
+                className={`px-3.5 py-2 rounded-lg text-xs font-medium border transition-colors disabled:opacity-50 ${
                   paymentMode === mode.value
-                    ? "border-[#0F6E5C] bg-[#0F6E5C] text-white"
-                    : "border-[#D8D5CB] text-[#6F756F] hover:bg-[#EDEBE3]"
+                    ? "border-emerald-600 bg-emerald-600 text-white"
+                    : "border-slate-200 text-slate-600 hover:bg-slate-50"
                 }`}
               >
                 {mode.label}
@@ -328,32 +293,32 @@ const CollectDueModal = ({ invoice, isOpen, onClose, onConfirm, onNetworkError }
         </div>
 
         {error && (
-          <p className="flex items-center gap-1.5 font-['IBM_Plex_Mono'] text-[11px] text-[#C0312B]">
+          <p className="flex items-center gap-1.5 text-xs text-red-600">
             <AlertCircle className="w-3.5 h-3.5 shrink-0" /> {error}
           </p>
         )}
       </div>
 
-      <div className="flex gap-2 px-5 pb-5 border-t border-[#E3E0D6] pt-4">
+      <div className="flex gap-2 px-5 pb-5 pt-1">
         <button
           onClick={onClose}
           disabled={submitting}
-          className="flex-1 py-2 font-['IBM_Plex_Mono'] text-xs uppercase border border-[#D8D5CB] text-[#6F756F] hover:bg-[#EDEBE3] rounded-[2px] transition-colors disabled:opacity-50"
+          className="flex-1 py-3 text-sm font-medium border border-slate-200 text-slate-600 hover:bg-slate-50 rounded-xl transition-colors disabled:opacity-50"
         >
           বাতিল
         </button>
         <button
           onClick={handleSubmit}
           disabled={!isValid || submitting}
-          className="flex-1 py-2 font-['IBM_Plex_Mono'] text-xs uppercase border border-[#0F6E5C] text-[#0F6E5C] hover:bg-[#0F6E5C] hover:text-white disabled:opacity-40 disabled:cursor-not-allowed rounded-[2px] transition-colors flex items-center justify-center gap-1.5"
+          className="flex-1 py-3 text-sm font-semibold bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed rounded-xl transition-colors flex items-center justify-center gap-1.5"
         >
           {submitting ? (
             <>
-              <Loader2 className="w-3.5 h-3.5 animate-spin" /> আদায় হচ্ছে...
+              <Loader2 className="w-4 h-4 animate-spin" /> আদায় হচ্ছে...
             </>
           ) : (
             <>
-              <Banknote className="w-3.5 h-3.5" /> আদায় করুন {numericAmount > 0 ? `(${fmt(numericAmount)})` : ""}
+              <Banknote className="w-4 h-4" /> আদায় করুন {numericAmount > 0 ? `(${fmt(numericAmount)})` : ""}
             </>
           )}
         </button>
@@ -362,9 +327,9 @@ const CollectDueModal = ({ invoice, isOpen, onClose, onConfirm, onNetworkError }
   );
 };
 
-// ─── Invoice Row (Ledger style) ───────────────────────────────────────────────
+// ─── Invoice Card ──────────────────────────────────────────────────────────────
 
-const InvoiceRow = ({
+const InvoiceCard = ({
   invoice,
   index,
   onDelivered,
@@ -373,28 +338,21 @@ const InvoiceRow = ({
   onLoadingChange,
   onError,
   onSuccess,
-  onNetworkError, // new
+  onNetworkError,
 }) => {
   const { date, time } = formatDateTime(invoice.createdAt);
   const [confirming, setConfirming] = useState(false);
   const [collectingDue, setCollectingDue] = useState(false);
   const [editingPatient, setEditingPatient] = useState(false);
   const [viewingDetails, setViewingDetails] = useState(false);
-  const [expanded, setExpanded] = useState(false);
+  const [actionsOpen, setActionsOpen] = useState(false);
 
   const due = getDue(invoice);
   const fullyPaid = isFullyPaid(invoice);
   const delivered = isDelivered(invoice);
   const hasReports = hasReportSchemas(invoice);
   const patient = invoice.patient;
-
-  const toggleExpanded = () => setExpanded((v) => !v);
-  const handleToggleKeyDown = (e) => {
-    if (e.key === "Enter" || e.key === " ") {
-      e.preventDefault();
-      toggleExpanded();
-    }
-  };
+  const creatorName = invoice.createdBy?.name;
 
   const handleConfirmDelivery = async () => {
     setConfirming(false);
@@ -468,131 +426,125 @@ const InvoiceRow = ({
         onError={onError}
       />
 
-      {/* Ledger row */}
-      <div>
-        <div
-          role="button"
-          tabIndex={0}
-          onClick={toggleExpanded}
-          onKeyDown={handleToggleKeyDown}
-          className="w-full text-left cursor-pointer"
-        >
-          <div className="flex items-baseline gap-3 py-2 group hover:bg-[#F0EFE9] px-1 rounded-sm transition-colors">
-            <span className="font-['IBM_Plex_Mono'] text-xs text-[#A8ACA3] tabular-nums w-5 shrink-0">
-              {String(index + 1).padStart(2, "0")}
-            </span>
-            <div className="flex-1 min-w-0 flex items-baseline gap-2">
-              <span className="text-sm text-[#1C1F1E] font-medium truncate">{patient.name}</span>
-              <span className="font-['IBM_Plex_Mono'] text-[10px] text-[#A8ACA3] shrink-0 hidden sm:inline-flex items-center gap-1">
-                #{invoice.invoiceId}
-                <CopyIdButton value={invoice.invoiceId} />
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+        {/* Top row: patient + status */}
+        <div className="px-4 pt-4 pb-3 flex items-start justify-between gap-3">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2 mb-1">
+              <span className="text-[10px] font-mono text-slate-300 tabular-nums shrink-0">
+                {String(index + 1).padStart(2, "0")}
               </span>
+              <h3 className="text-[15px] font-semibold text-slate-900 truncate">{patient.name}</h3>
             </div>
-            <span className="flex-1 border-b border-dotted border-[#D8D5CB] translate-y-[-3px] hidden sm:block" />
-            <div className="flex items-center gap-2 shrink-0">
-              {/* Payment status */}
-              {fullyPaid ? (
-                <span className="font-['IBM_Plex_Mono'] text-xs text-[#0F6E5C] font-semibold">পরিশোধিত</span>
-              ) : (
-                <span className="font-['IBM_Plex_Mono'] text-xs text-[#C0312B] font-semibold tabular-nums">
-                  বাকি ৳{due.toLocaleString()}
+            <div className="flex items-center gap-1 text-xs text-slate-400">
+              <span className="font-mono">#{invoice.invoiceId}</span>
+              <CopyIdButton value={invoice.invoiceId} />
+            </div>
+          </div>
+          <div className="text-right shrink-0">
+            <p className="text-base font-bold text-slate-900 tabular-nums">{fmt(invoice.amount?.final ?? 0)}</p>
+            <div className="flex items-center justify-end gap-1.5 mt-1">
+              {delivered && (
+                <span className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-blue-600">
+                  <PackageCheck className="w-3 h-3" /> ডেলিভারি
                 </span>
               )}
-              {/* Delivery dot */}
-              {delivered && (
-                <span
-                  className="w-1.5 h-1.5 rounded-full shrink-0"
-                  style={{ backgroundColor: "#1E4FA0" }}
-                  title="Delivered"
-                />
+              {fullyPaid ? (
+                <span className="text-[10px] font-semibold uppercase tracking-wide text-emerald-600">পরিশোধিত</span>
+              ) : (
+                <span className="text-[10px] font-semibold uppercase tracking-wide text-red-600 tabular-nums">
+                  বাকি {fmt(due)}
+                </span>
               )}
-              {/* Amount */}
-              <span className="font-['IBM_Plex_Mono'] text-sm text-[#1C1F1E] tabular-nums shrink-0">
-                {fmt(invoice.amount?.final ?? 0)}
-              </span>
-              {/* Expand chevron */}
-              <ChevronDown
-                className={`w-3.5 h-3.5 text-[#A8ACA3] transition-transform shrink-0 ${expanded ? "rotate-180" : ""}`}
-              />
             </div>
           </div>
         </div>
 
-        {/* Sub-row: date + actions */}
-        {expanded && (
-          <div className="pl-8 pr-1 py-2 border-t border-[#EDEBE3] bg-[#FAF9F5] rounded-b-sm">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div className="font-['IBM_Plex_Mono'] text-[10px] text-[#A8ACA3] space-y-0.5">
-                <p>
-                  {date} · {time}
-                  {invoice.createdBy?.name && ` · ${invoice.createdBy.name}`}
-                </p>
-                <p className="sm:hidden flex items-center gap-1 text-[10px]">
-                  #{invoice.invoiceId}
-                  <CopyIdButton value={invoice.invoiceId} />
-                </p>
-              </div>
-              <div className="flex flex-wrap items-center gap-1.5">
-                <ManifestChip onClick={() => setViewingDetails(true)} icon={Eye} label="Details" />
-                <ManifestLinkChip to={`/outdoor/invoice/print/${invoice.invoiceId}`} icon={FileText} label="Invoice" />
-                {hasReports && (
-                  <ManifestLinkChip
-                    to="/report"
-                    state={{ invoiceId: invoice.invoiceId }}
-                    icon={FlaskConical}
-                    label="Reports"
-                    accent
-                  />
-                )}
-                <ManifestChip onClick={() => setEditingPatient(true)} icon={Pencil} label="Edit" />
-                {!fullyPaid && (
-                  <ManifestChip onClick={() => setCollectingDue(true)} icon={CreditCard} label="Collect Due" green />
-                )}
-                {!delivered && (
-                  <ManifestChip onClick={() => setConfirming(true)} icon={PackageCheck} label="Delivery" blue />
-                )}
-              </div>
+        {/* Created-by / timestamp strip — kept plain, always visible (glanceable, unlike the action buttons) */}
+        <div className="mx-4 mb-3 px-3 py-2 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-between gap-2 text-[11px]">
+          <span className="flex items-center gap-1.5 text-slate-500 min-w-0">
+            <UserCheck className="w-3.5 h-3.5 shrink-0 text-slate-400" />
+            <span className="truncate">{creatorName || "—"}</span>
+          </span>
+          <span className="flex items-center gap-1.5 text-slate-500 shrink-0">
+            <Clock className="w-3.5 h-3.5 text-slate-400" />
+            {date} · {time}
+          </span>
+        </div>
+
+        {/* Actions tray — collapsed by default, expands on click; hidden on print */}
+        <div className="px-4 pb-4 no-print">
+          {actionsOpen ? (
+            <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
+              <ActionChip onClick={() => setViewingDetails(true)} icon={Eye} label="Details" />
+              <ActionLinkChip to={`/outdoor/invoice/print/${invoice.invoiceId}`} icon={FileText} label="Invoice" />
+              {hasReports && (
+                <ActionLinkChip
+                  to="/report"
+                  state={{ invoiceId: invoice.invoiceId }}
+                  icon={FlaskConical}
+                  label="Reports"
+                  tone="red"
+                />
+              )}
+              <ActionChip onClick={() => setEditingPatient(true)} icon={Pencil} label="Edit" />
+              {!fullyPaid && (
+                <ActionChip onClick={() => setCollectingDue(true)} icon={CreditCard} label="Collect Due" tone="green" />
+              )}
+              {!delivered && (
+                <ActionChip onClick={() => setConfirming(true)} icon={PackageCheck} label="Delivery" tone="blue" />
+              )}
+              <button
+                onClick={() => setActionsOpen(false)}
+                className="shrink-0 ml-auto w-8 h-8 flex items-center justify-center rounded-lg border border-slate-200 text-slate-400 hover:text-slate-900 hover:bg-slate-50 transition-colors"
+                aria-label="Hide actions"
+              >
+                <ChevronUp className="w-3.5 h-3.5" />
+              </button>
             </div>
-          </div>
-        )}
+          ) : (
+            <button
+              onClick={() => setActionsOpen(true)}
+              className="w-full flex items-center justify-center gap-1.5 py-2 text-xs font-medium text-slate-500 border border-dashed border-slate-200 hover:border-slate-300 hover:bg-slate-50 rounded-xl transition-colors"
+            >
+              <MoreHorizontal className="w-3.5 h-3.5" /> অ্যাকশন দেখুন
+            </button>
+          )}
+        </div>
       </div>
     </>
   );
 };
 
-// ─── Manifest Chips ───────────────────────────────────────────────────────────
+// ─── Action chips ──────────────────────────────────────────────────────────────
 
-const ManifestChip = ({ onClick, icon: Icon, label, green, blue, accent }) => {
-  const base =
-    "inline-flex items-center gap-1 px-2.5 py-1 text-[10px] font-['IBM_Plex_Mono'] uppercase tracking-wide border transition-colors rounded-[2px]";
-  const color = green
-    ? "border-[#0F6E5C]/30 text-[#0F6E5C] hover:bg-[#0F6E5C]/5"
-    : blue
-      ? "border-[#1E4FA0]/30 text-[#1E4FA0] hover:bg-[#1E4FA0]/5"
-      : accent
-        ? "border-[#C0312B]/30 text-[#C0312B] hover:bg-[#C0312B]/5"
-        : "border-[#D8D5CB] text-[#6F756F] hover:bg-[#EDEBE3]";
-  return (
-    <button onClick={onClick} className={`${base} ${color}`}>
-      <Icon className="w-3 h-3" />
-      {label}
-    </button>
-  );
+const chipToneClasses = {
+  default: "border-slate-200 text-slate-600 hover:bg-slate-50",
+  green: "border-emerald-200 text-emerald-600 hover:bg-emerald-50",
+  blue: "border-blue-200 text-blue-600 hover:bg-blue-50",
+  red: "border-red-200 text-red-600 hover:bg-red-50",
 };
 
-const ManifestLinkChip = ({ to, state, icon: Icon, label, accent }) => {
-  const base =
-    "inline-flex items-center gap-1 px-2.5 py-1 text-[10px] font-['IBM_Plex_Mono'] uppercase tracking-wide border transition-colors rounded-[2px]";
-  const color = accent
-    ? "border-[#C0312B]/30 text-[#C0312B] hover:bg-[#C0312B]/5"
-    : "border-[#D8D5CB] text-[#6F756F] hover:bg-[#EDEBE3]";
-  return (
-    <Link to={to} state={state} className={`${base} ${color}`}>
-      <Icon className="w-3 h-3" />
-      {label}
-    </Link>
-  );
-};
+const ActionChip = ({ onClick, icon: Icon, label, tone = "default" }) => (
+  <button
+    onClick={onClick}
+    className={`shrink-0 inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium border rounded-lg transition-colors whitespace-nowrap ${chipToneClasses[tone]}`}
+  >
+    <Icon className="w-3.5 h-3.5" />
+    {label}
+  </button>
+);
+
+const ActionLinkChip = ({ to, state, icon: Icon, label, tone = "default" }) => (
+  <Link
+    to={to}
+    state={state}
+    className={`shrink-0 inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium border rounded-lg transition-colors whitespace-nowrap ${chipToneClasses[tone]}`}
+  >
+    <Icon className="w-3.5 h-3.5" />
+    {label}
+  </Link>
+);
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
@@ -615,9 +567,10 @@ const InvoiceList = () => {
   const [nextCursor, setNextCursor] = useState(null);
   const [loadingMessage, setLoadingMessage] = useState(null);
   const [popup, setPopup] = useState(null);
-  const [networkError, setNetworkError] = useState(false); // new
+  const [networkError, setNetworkError] = useState(false);
   const [statusFilter, setStatusFilter] = useState("all");
   const [timeRange, setTimeRange] = useState(null);
+  const [searchTerm, setSearchTerm] = useState("");
 
   const loadInvoices = async (cursor = null, replace = true, range = timeRange) => {
     try {
@@ -662,20 +615,20 @@ const InvoiceList = () => {
   const totalPaid = invoices.reduce((s, inv) => s + (inv.amount?.paid ?? 0), 0);
   const totalDue = invoices.reduce((s, inv) => s + getDue(inv), 0);
   const totalBilled = invoices.reduce((s, inv) => s + (inv.amount?.final ?? 0), 0);
-  const pendingCount = invoices.filter((inv) => !isFullyPaid(inv)).length;
 
-  const filteredInvoices =
-    statusFilter === "pending"
-      ? invoices.filter((inv) => !isFullyPaid(inv))
-      : statusFilter === "paid"
-        ? invoices.filter((inv) => isFullyPaid(inv))
-        : invoices;
-
-  const sealLabel = timeRange
-    ? new Date(timeRange.end)
-        .toLocaleDateString("en-US", { day: "2-digit", month: "short", year: "numeric" })
-        .toUpperCase()
-    : "";
+  const filteredInvoices = invoices
+    .filter((inv) =>
+      statusFilter === "pending" ? !isFullyPaid(inv) : statusFilter === "paid" ? isFullyPaid(inv) : true,
+    )
+    .filter((inv) => {
+      if (!searchTerm.trim()) return true;
+      const q = searchTerm.trim().toLowerCase();
+      return (
+        inv.patient?.name?.toLowerCase().includes(q) ||
+        inv.invoiceId?.toLowerCase().includes(q) ||
+        inv.patient?.contactNumber?.includes(q)
+      );
+    });
 
   const headingLabel = (() => {
     if (!timeRange) return "";
@@ -725,87 +678,86 @@ const InvoiceList = () => {
     setInvoices((prev) => prev.map((inv) => (inv.invoiceId === id ? { ...inv, ...fields } : inv)));
 
   return (
-    <section className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 px-4 py-6 font-noto">
+    <section className="min-h-screen bg-slate-50 pb-8 font-noto">
       <style>{`
         @media print {
           * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
           body * { visibility: hidden; }
           #invoicelist-printable, #invoicelist-printable * { visibility: visible; }
-          #invoicelist-printable { position: fixed; top: 0; left: 0; width: 100%; padding: 32px; box-shadow: none; }
+          #invoicelist-printable { position: fixed; top: 0; left: 0; width: 100%; padding: 24px; }
           .no-print { display: none !important; }
         }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
       `}</style>
 
       {loadingMessage && <LoadingScreen message={loadingMessage} />}
       {popup && <Popup type={popup.type} message={popup.message} onClose={() => setPopup(null)} />}
       {networkError && <Popup type="offline" onClose={() => setNetworkError(false)} />}
 
-      <div className="max-w-2xl mx-auto">
-        {/* Page header */}
-        <div className="flex items-center justify-between mb-5 no-print">
-          <div>
-            <h1 className="font-['IBM_Plex_Sans'] text-2xl sm:text-3xl font-semibold text-[#1C1F1E]">ইনভয়েস তালিকা</h1>
-            <p className="text-base text-[#767D78] mt-1">নির্ধারিত সময়সীমায় তৈরি সকল ইনভয়েস।</p>
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => window.print()}
-              disabled={initialLoading}
-              className="px-3 py-2 rounded-sm border border-[#1C1F1E]/15 text-[#1C1F1E] hover:bg-[#1C1F1E] hover:text-white transition-colors flex items-center gap-1.5 font-['IBM_Plex_Mono'] text-xs uppercase disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              <Printer className="w-3.5 h-3.5" /> Print
-            </button>
+      {/* Sticky top bar */}
+      <div className="sticky top-0 z-30 bg-white/95 backdrop-blur border-b border-slate-200 no-print">
+        <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 min-w-0">
             <Link
               to="/outdoor"
-              className="px-3 py-2 rounded-sm border border-[#1C1F1E]/15 text-[#1C1F1E] hover:bg-[#1C1F1E] hover:text-white transition-colors flex items-center gap-1.5 font-['IBM_Plex_Mono'] text-xs uppercase"
+              className="w-9 h-9 shrink-0 flex items-center justify-center rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors"
             >
-              <ArrowLeft className="w-3.5 h-3.5" /> Back
+              <ArrowLeft className="w-4 h-4" />
             </Link>
+            <div className="min-w-0">
+              <h1 className="text-base font-bold text-slate-900 truncate">ইনভয়েস তালিকা</h1>
+              <p className="text-[11px] text-slate-400 truncate">{fmtNum(total)}টি ইনভয়েস</p>
+            </div>
           </div>
+          <button
+            onClick={() => window.print()}
+            disabled={initialLoading}
+            className="w-9 h-9 shrink-0 flex items-center justify-center rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors disabled:opacity-40"
+          >
+            <Printer className="w-4 h-4" />
+          </button>
         </div>
+      </div>
 
+      <div className="max-w-2xl mx-auto px-4 pt-4">
         {/* TimeFrame */}
-        <div className="mb-5 no-print">
+        <div className="mb-4 no-print">
           <TimeFrame onFetchData={handleFetchData} />
         </div>
 
-        {/* Manifest card */}
         {initialLoading ? (
-          <SkeletonManifest />
+          <SkeletonList />
         ) : (
-          <div
-            id="invoicelist-printable"
-            className="bg-white border border-[#E3E0D6] rounded-lg shadow-[0_1px_2px_rgba(28,31,30,0.04)] overflow-hidden"
-          >
-            {/* Letterhead */}
-            <div className="px-6 sm:px-8 pt-5 pb-4 text-center border-b border-[#E3E0D6] bg-[#FAF9F5]">
-              <h3 className="font-['IBM_Plex_Sans'] text-lg font-bold text-[#1C1F1E] tracking-wide">
-                Azizul Haque Diagnostic Center
-              </h3>
-              <p className="font-['IBM_Plex_Mono'] text-xs text-[#6F756F] mt-1">Hospital Road, Bhaluka, Mymensingh</p>
-            </div>
-
-            {/* Header band */}
-            <div className="px-6 sm:px-8 pt-6 pb-5 border-b border-[#E3E0D6] flex items-start justify-between gap-4">
-              <div>
-                <p className="font-['IBM_Plex_Mono'] text-xs uppercase text-[#0F6E5C] mb-1.5">ইনভয়েস লেজার</p>
-                <h2 className="font-['IBM_Plex_Sans'] text-2xl font-semibold text-[#1C1F1E]">{headingLabel}</h2>
-                <div className="font-['IBM_Plex_Mono'] text-sm text-[#8A8F89] mt-2 space-y-0.5">
-                  <p>মোট ইনভয়েস — {fmtNum(total)}টি</p>
-                  <p>মোট বিলকৃত — {fmt(totalBilled)}</p>
-                  <p>
-                    <span className="text-[#0F6E5C]">আদায় — {fmt(totalPaid)}</span>
-                    {totalDue > 0 && <span className="text-[#C0312B] ml-3">বাকি — {fmt(totalDue)}</span>}
-                  </p>
+          <div id="invoicelist-printable">
+            {/* Summary card */}
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 mb-4">
+              <div className="flex items-center justify-between mb-3">
+                <div>
+                  <p className="text-[11px] font-medium uppercase tracking-wide text-emerald-600">ইনভয়েস লেজার</p>
+                  <h2 className="text-lg font-bold text-slate-900">{headingLabel}</h2>
                 </div>
               </div>
-              <RoundSeal dateLabel={sealLabel} />
+              <div className="grid grid-cols-3 gap-2">
+                <SummaryStat label="মোট বিলকৃত" value={fmt(totalBilled)} />
+                <SummaryStat label="আদায়" value={fmt(totalPaid)} tone="green" />
+                <SummaryStat label="বাকি" value={fmt(totalDue)} tone={totalDue > 0 ? "red" : "green"} />
+              </div>
             </div>
 
-            {/* Filter bar */}
-            <div className="px-6 sm:px-8 py-3 border-b border-[#E3E0D6] bg-[#FAF9F5] flex items-center gap-3 no-print flex-wrap">
-              <p className="font-['IBM_Plex_Mono'] text-[10px] uppercase text-[#A8ACA3] shrink-0">ফিল্টার</p>
-              <div className="flex items-center gap-1">
+            {/* Search + filter — no-print */}
+            <div className="mb-4 space-y-2 no-print">
+              <div className="relative">
+                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                <input
+                  type="text"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  placeholder="নাম, ফোন বা আইডি দিয়ে খুঁজুন..."
+                  className="w-full pl-10 pr-3 py-2.5 text-sm bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                />
+              </div>
+              <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
                 {[
                   { key: "all", label: "সব" },
                   { key: "pending", label: "বাকি" },
@@ -814,85 +766,78 @@ const InvoiceList = () => {
                   <button
                     key={key}
                     onClick={() => setStatusFilter(key)}
-                    className={`px-3 py-1 font-['IBM_Plex_Mono'] text-xs uppercase transition-colors rounded-[2px] border ${
+                    className={`shrink-0 px-3.5 py-1.5 text-xs font-medium rounded-lg border transition-colors ${
                       statusFilter === key
-                        ? "border-[#1C1F1E]/30 bg-[#1C1F1E] text-white"
-                        : "border-transparent text-[#6F756F] hover:border-[#D8D5CB] hover:bg-[#EDEBE3]"
+                        ? "border-slate-900 bg-slate-900 text-white"
+                        : "border-slate-200 text-slate-600 hover:bg-white"
                     }`}
                   >
                     {label}
                   </button>
                 ))}
               </div>
-              {statusFilter !== "all" && hasMore && (
-                <p className="font-['IBM_Plex_Mono'] text-[10px] text-[#A8ACA3] ml-auto">
-                  * শুধু লোড করা ইনভয়েসে ফিল্টার প্রযোজ্য
-                </p>
-              )}
             </div>
 
-            {/* Column header */}
-            <div className="px-6 sm:px-8 pt-4 pb-1 flex items-center gap-3">
-              <span className="font-['IBM_Plex_Mono'] text-[10px] uppercase text-[#A8ACA3] w-5 shrink-0">#</span>
-              <span className="font-['IBM_Plex_Mono'] text-[10px] uppercase text-[#A8ACA3] flex-1">রোগীর নাম</span>
-              <span className="font-['IBM_Plex_Mono'] text-[10px] uppercase text-[#A8ACA3] shrink-0">পরিমাণ</span>
-            </div>
-
-            {/* Invoice rows */}
-            <div className="px-6 sm:px-8 pb-4">
-              {filteredInvoices.length === 0 ? (
-                <div className="flex items-center gap-2 py-8 text-[#A8ACA3]">
-                  <AlertCircle className="w-3.5 h-3.5" />
-                  <p className="font-['IBM_Plex_Mono'] text-xs">
-                    {statusFilter !== "all"
+            {/* Invoice cards */}
+            {filteredInvoices.length === 0 ? (
+              <div className="flex flex-col items-center justify-center gap-2 py-16 text-slate-400 bg-white rounded-2xl border border-slate-200">
+                <AlertCircle className="w-5 h-5" />
+                <p className="text-xs">
+                  {searchTerm.trim()
+                    ? "কোনো ফলাফল পাওয়া যায়নি"
+                    : statusFilter !== "all"
                       ? "এই ফিল্টারে কোনো ইনভয়েস নেই"
                       : "নির্ধারিত সময়সীমায় কোনো ইনভয়েস তৈরি হয়নি"}
-                  </p>
-                </div>
-              ) : (
-                <div className="divide-y divide-[#EDEBE3]">
-                  {filteredInvoices.map((invoice, index) => (
-                    <InvoiceRow
-                      key={invoice._id}
-                      invoice={invoice}
-                      index={index}
-                      onDelivered={handleDelivered}
-                      onCollected={handleCollected}
-                      onPatientUpdated={handlePatientUpdated}
-                      onLoadingChange={(msg) => setLoadingMessage(msg)}
-                      onError={(msg) => setPopup({ type: "error", message: msg })}
-                      onSuccess={(msg) => setPopup({ type: "success", message: msg })}
-                      onNetworkError={() => setNetworkError(true)}
-                    />
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Load more */}
-            {hasMore && statusFilter === "all" && (
-              <div className="px-6 sm:px-8 pb-5 border-t border-[#E3E0D6] pt-4 no-print">
-                <button
-                  onClick={() => loadInvoices(nextCursor, false)}
-                  disabled={loadingMore}
-                  className="w-full flex items-center justify-center gap-2 py-2.5 font-['IBM_Plex_Mono'] text-xs uppercase text-[#6F756F] hover:text-[#1C1F1E] border border-dashed border-[#D8D5CB] hover:border-[#1C1F1E]/30 rounded-[2px] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                >
-                  <ChevronDown className="w-3.5 h-3.5" />
-                  আরো লোড করুন (+20)
-                </button>
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {filteredInvoices.map((invoice, index) => (
+                  <InvoiceCard
+                    key={invoice._id}
+                    invoice={invoice}
+                    index={index}
+                    onDelivered={handleDelivered}
+                    onCollected={handleCollected}
+                    onPatientUpdated={handlePatientUpdated}
+                    onLoadingChange={(msg) => setLoadingMessage(msg)}
+                    onError={(msg) => setPopup({ type: "error", message: msg })}
+                    onSuccess={(msg) => setPopup({ type: "success", message: msg })}
+                    onNetworkError={() => setNetworkError(true)}
+                  />
+                ))}
               </div>
             )}
 
-            {/* Footer note */}
-            <div className="px-6 sm:px-8 py-3 border-t border-[#E3E0D6] bg-[#FAF9F5]">
-              <p className="font-['IBM_Plex_Mono'] text-[10px] text-[#A8ACA3]">
-                * শুধুমাত্র সক্রিয় (ডিলিট না হওয়া) ইনভয়েসের হিসাব অন্তর্ভুক্ত
-              </p>
-            </div>
+            {/* Load more */}
+            {hasMore && statusFilter === "all" && (
+              <button
+                onClick={() => loadInvoices(nextCursor, false)}
+                disabled={loadingMore}
+                className="mt-4 w-full flex items-center justify-center gap-2 py-3 text-xs font-medium text-slate-500 hover:text-slate-900 border border-dashed border-slate-300 hover:border-slate-400 rounded-xl transition-colors disabled:opacity-40 disabled:cursor-not-allowed no-print"
+              >
+                <ChevronDown className="w-3.5 h-3.5" />
+                আরো লোড করুন (+20)
+              </button>
+            )}
+
+            <p className="mt-4 text-center text-[10px] text-slate-400">
+              শুধুমাত্র সক্রিয় (ডিলিট না হওয়া) ইনভয়েসের হিসাব অন্তর্ভুক্ত
+            </p>
           </div>
         )}
       </div>
     </section>
+  );
+};
+
+const SummaryStat = ({ label, value, tone = "default" }) => {
+  const toneClass = tone === "green" ? "text-emerald-600" : tone === "red" ? "text-red-600" : "text-slate-900";
+  return (
+    <div className="bg-slate-50 rounded-xl px-2.5 py-2">
+      <p className="text-[9px] uppercase tracking-wide text-slate-400 mb-0.5">{label}</p>
+      <p className={`text-xs font-bold tabular-nums truncate ${toneClass}`}>{value}</p>
+    </div>
   );
 };
 
@@ -956,22 +901,22 @@ export const InvoiceDetailsModal = ({
   return (
     <Modal isOpen={isOpen} onClose={onClose} size="sm">
       {/* Header */}
-      <div className="flex items-center justify-between px-5 pt-5 pb-4 border-b border-[#E3E0D6] bg-[#FAF9F5]">
+      <div className="flex items-center justify-between px-5 pt-5 pb-4 border-b border-slate-100">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-[3px] border border-[#D8D5CB] flex items-center justify-center shrink-0 bg-white">
-            <Receipt className="w-4 h-4 text-[#1E4FA0]" />
+          <div className="w-9 h-9 rounded-xl bg-blue-50 flex items-center justify-center shrink-0">
+            <Receipt className="w-4 h-4 text-blue-600" />
           </div>
           <div>
-            <h2 className="font-['IBM_Plex_Sans'] text-sm font-bold text-[#1C1F1E] leading-tight">Invoice Details</h2>
+            <h2 className="text-sm font-bold text-slate-900 leading-tight">Invoice Details</h2>
             <div className="flex items-center gap-1 mt-0.5">
-              <p className="font-['IBM_Plex_Mono'] text-[10px] text-[#A8ACA3]">#{invoiceId}</p>
+              <p className="text-xs text-slate-400 font-mono">#{invoiceId}</p>
               <CopyIdButton value={invoiceId} size="sm" />
             </div>
           </div>
         </div>
         <button
           onClick={onClose}
-          className="w-7 h-7 flex items-center justify-center rounded-sm text-[#A8ACA3] hover:text-[#1C1F1E] hover:bg-[#EDEBE3] transition-colors"
+          className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-400 hover:text-slate-900 hover:bg-slate-100 transition-colors"
         >
           <X className="w-4 h-4" />
         </button>
@@ -983,12 +928,9 @@ export const InvoiceDetailsModal = ({
 
         {error && !loading && (
           <div className="flex flex-col items-center justify-center py-8 text-center gap-3">
-            <AlertCircle className="w-5 h-5 text-[#C0312B]" />
-            <p className="font-['IBM_Plex_Mono'] text-xs text-[#6F756F]">{error}</p>
-            <button
-              onClick={fetchInvoice}
-              className="font-['IBM_Plex_Mono'] text-xs text-[#1E4FA0] hover:underline uppercase"
-            >
+            <AlertCircle className="w-5 h-5 text-red-600" />
+            <p className="text-xs text-slate-500">{error}</p>
+            <button onClick={fetchInvoice} className="text-xs text-blue-600 hover:underline font-medium">
               আবার চেষ্টা করুন
             </button>
           </div>
@@ -996,6 +938,23 @@ export const InvoiceDetailsModal = ({
 
         {invoice && !loading && (
           <>
+            {/* Created-by / timestamp — prominent, at top of details */}
+            <div className="rounded-xl border border-blue-100 bg-blue-50/60 p-3.5 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2 min-w-0">
+                <UserCheck className="w-4 h-4 text-blue-600 shrink-0" />
+                <div className="min-w-0">
+                  <p className="text-[10px] uppercase tracking-wide text-blue-500">তৈরি করেছেন</p>
+                  <p className="text-xs font-semibold text-slate-900 truncate">{createdBy?.name ?? "—"}</p>
+                </div>
+              </div>
+              <div className="text-right shrink-0">
+                <p className="text-[10px] uppercase tracking-wide text-blue-500">তারিখ ও সময়</p>
+                <p className="text-xs font-semibold text-slate-900">
+                  {date} · {time}
+                </p>
+              </div>
+            </div>
+
             {/* Patient */}
             <ManifestBlock icon={UserCircle} label="রোগীর তথ্য">
               <div className="grid grid-cols-2 gap-x-4 gap-y-3">
@@ -1003,24 +962,13 @@ export const InvoiceDetailsModal = ({
                 <ManifestField label="Gender" value={<span className="capitalize">{patient.gender}</span>} />
                 <ManifestField label="Age" value={`${patient.age} yrs`} />
                 <ManifestField label="Contact" value={patient.contactNumber} />
-                <div className="col-span-2">
-                  <ManifestField label="Date & Time" value={`${date} · ${time}`} />
-                </div>
               </div>
             </ManifestBlock>
 
-            {/* Created By */}
-            {createdBy?.name && (
-              <ManifestBlock icon={UserCheck} label="তৈরিকারী">
-                <div className="grid grid-cols-2 gap-x-4 gap-y-3">
-                  <ManifestField label="Staff" value={createdBy.name} />
-                  <ManifestField label="Created At" value={`${date} · ${time}`} />
-                  {delivered && deliveredBy?.name && (
-                    <div className="col-span-2">
-                      <ManifestField label="Delivered By" value={deliveredBy.name} valueClass="text-[#1E4FA0]" />
-                    </div>
-                  )}
-                </div>
+            {/* Delivery info */}
+            {delivered && deliveredBy?.name && (
+              <ManifestBlock icon={PackageCheck} label="ডেলিভারি">
+                <ManifestField label="Delivered By" value={deliveredBy.name} valueClass="text-blue-600" />
               </ManifestBlock>
             )}
 
@@ -1031,14 +979,14 @@ export const InvoiceDetailsModal = ({
                   <ManifestField label="Name" value={referrer.name || "—"} />
                   {referrer.type && (
                     <div>
-                      <p className="font-['IBM_Plex_Mono'] text-[10px] uppercase text-[#A8ACA3] mb-0.5">Type</p>
+                      <p className="text-[10px] uppercase text-slate-400 mb-0.5">Type</p>
                       <span
-                        className={`inline-block px-2 py-0.5 text-[10px] font-semibold rounded-[2px] capitalize font-['IBM_Plex_Mono'] ${
+                        className={`inline-block px-2 py-0.5 text-[10px] font-semibold rounded-md capitalize ${
                           referrer.type === "doctor"
-                            ? "bg-blue-50 text-blue-700"
+                            ? "bg-blue-100 text-blue-700"
                             : referrer.type === "agent"
-                              ? "bg-amber-50 text-amber-700"
-                              : "bg-teal-50 text-teal-700"
+                              ? "bg-amber-100 text-amber-700"
+                              : "bg-teal-100 text-teal-700"
                         }`}
                       >
                         {referrer.type}
@@ -1049,14 +997,14 @@ export const InvoiceDetailsModal = ({
                     <ManifestField
                       label="Discount"
                       value={`- ${fmt(amount.referrerDiscount)}`}
-                      valueClass="text-[#C0312B]"
+                      valueClass="text-red-600"
                     />
                   )}
                   {hasCommission && (
                     <ManifestField
                       label="Commission"
                       value={fmt(amount.referrerCommission)}
-                      valueClass="text-[#1E4FA0]"
+                      valueClass="text-blue-600"
                     />
                   )}
                 </div>
@@ -1068,14 +1016,10 @@ export const InvoiceDetailsModal = ({
               <div className="space-y-1">
                 {(invoice.tests ?? []).map((t, i) => (
                   <div key={t.testId || i} className="flex items-baseline gap-2">
-                    <span className="font-['IBM_Plex_Mono'] text-[10px] text-[#A8ACA3] w-4 shrink-0">
-                      {String(i + 1).padStart(2, "0")}
-                    </span>
-                    <span className="text-xs text-[#1C1F1E] flex-1 truncate">{t.name}</span>
-                    <span className="flex-1 border-b border-dotted border-[#D8D5CB] translate-y-[-3px]" />
-                    <span className="font-['IBM_Plex_Mono'] text-xs text-[#1E4FA0] tabular-nums shrink-0">
-                      {fmt(t.price)}
-                    </span>
+                    <span className="text-[10px] text-slate-400 w-4 shrink-0">{String(i + 1).padStart(2, "0")}</span>
+                    <span className="text-xs text-slate-900 flex-1 truncate">{t.name}</span>
+                    <span className="flex-1 border-b border-dotted border-slate-200 translate-y-[-3px]" />
+                    <span className="text-xs text-blue-600 tabular-nums shrink-0 font-medium">{fmt(t.price)}</span>
                   </div>
                 ))}
               </div>
@@ -1090,15 +1034,13 @@ export const InvoiceDetailsModal = ({
                     return (
                       <div key={i} className="flex items-center justify-between">
                         <div>
-                          <p className="text-xs text-[#1C1F1E] font-medium">{c.by?.name ?? "—"}</p>
-                          <p className="font-['IBM_Plex_Mono'] text-[10px] text-[#A8ACA3]">
+                          <p className="text-xs text-slate-900 font-medium">{c.by?.name ?? "—"}</p>
+                          <p className="text-[10px] text-slate-400">
                             {`${cDate} · ${cTime}`}
                             {c.mode && ` · ${paymentModeLabel(c.mode)}`}
                           </p>
                         </div>
-                        <span className="font-['IBM_Plex_Mono'] text-sm text-[#0F6E5C] tabular-nums font-semibold">
-                          {fmt(c.amount)}
-                        </span>
+                        <span className="text-sm text-emerald-600 tabular-nums font-semibold">{fmt(c.amount)}</span>
                       </div>
                     );
                   })}
@@ -1108,38 +1050,38 @@ export const InvoiceDetailsModal = ({
 
             {/* Payment */}
             <ManifestBlock icon={DollarSign} label="পেমেন্ট বিবরণ">
-              <div className="space-y-1.5 font-['IBM_Plex_Mono'] text-xs">
+              <div className="space-y-1.5 text-xs">
                 {showSubtotal && <LedgerPayRow label="Subtotal" value={fmt(amount.initial)} />}
                 {hasDiscount && (
                   <LedgerPayRow
                     label="Referrer Discount"
                     value={`- ${fmt(amount.referrerDiscount)}`}
-                    valueClass="text-[#C0312B]"
+                    valueClass="text-red-600"
                   />
                 )}
                 {(amount?.labAdjustment ?? 0) > 0 && (
                   <LedgerPayRow
                     label="Lab Adjustment"
                     value={`- ${fmt(amount.labAdjustment)}`}
-                    valueClass="text-[#C0312B]"
+                    valueClass="text-red-600"
                   />
                 )}
-                <div className="flex justify-between pt-2 border-t border-[#E3E0D6] font-semibold text-[#1C1F1E]">
+                <div className="flex justify-between pt-2 border-t border-slate-100 font-semibold text-slate-900">
                   <span>মোট</span>
-                  <span className="text-[#1E4FA0]">{fmt(amount.final)}</span>
+                  <span className="text-blue-600">{fmt(amount.final)}</span>
                 </div>
-                <LedgerPayRow label="আদায়" value={fmt(amount.paid)} valueClass="text-[#0F6E5C] font-semibold" />
+                <LedgerPayRow label="আদায়" value={fmt(amount.paid)} valueClass="text-emerald-600 font-semibold" />
                 {invoice.paymentMode && (
                   <LedgerPayRow
                     label="সর্বশেষ মাধ্যম"
                     value={paymentModeLabel(invoice.paymentMode)}
-                    valueClass="text-[#6F756F]"
+                    valueClass="text-slate-500"
                   />
                 )}
                 {!fullyPaid ? (
-                  <LedgerPayRow label="বাকি" value={fmt(due)} valueClass="text-[#C0312B] font-semibold" />
+                  <LedgerPayRow label="বাকি" value={fmt(due)} valueClass="text-red-600 font-semibold" />
                 ) : (
-                  <div className="flex items-center justify-end gap-1.5 text-[#0F6E5C]">
+                  <div className="flex items-center justify-end gap-1.5 text-emerald-600">
                     <CheckCircle2 className="w-3 h-3" />
                     <span className="text-[10px] font-semibold uppercase">Fully Paid</span>
                   </div>
@@ -1151,16 +1093,16 @@ export const InvoiceDetailsModal = ({
             <div className="flex items-center gap-2">
               <ManifestStatusBadge
                 active={delivered}
-                activeClass="text-[#1E4FA0] border-[#1E4FA0]/30 bg-[#1E4FA0]/5"
-                inactiveClass="text-[#A8ACA3] border-[#D8D5CB]"
+                activeClass="text-blue-600 border-blue-200 bg-blue-50"
+                inactiveClass="text-slate-400 border-slate-200"
                 icon={PackageCheck}
                 activeLabel="Delivered"
                 inactiveLabel="Not Delivered"
               />
               <ManifestStatusBadge
                 active={fullyPaid}
-                activeClass="text-[#0F6E5C] border-[#0F6E5C]/30 bg-[#0F6E5C]/5"
-                inactiveClass="text-[#C0312B] border-[#C0312B]/30 bg-[#C0312B]/5"
+                activeClass="text-emerald-600 border-emerald-200 bg-emerald-50"
+                inactiveClass="text-red-600 border-red-200 bg-red-50"
                 icon={Wallet}
                 activeLabel="Fully Paid"
                 inactiveLabel={`Due ৳${due.toLocaleString()}`}
@@ -1172,17 +1114,17 @@ export const InvoiceDetailsModal = ({
 
       {/* Footer */}
       {invoiceRow && (
-        <div className="px-5 pb-5 border-t border-[#E3E0D6] pt-4 space-y-2">
+        <div className="px-5 pb-5 border-t border-slate-100 pt-4 space-y-2">
           <div className="flex gap-2">
             <button
               onClick={onClose}
-              className="py-2 px-4 font-['IBM_Plex_Mono'] text-xs uppercase border border-[#D8D5CB] text-[#6F756F] hover:bg-[#EDEBE3] rounded-[2px] transition-colors"
+              className="py-2.5 px-4 text-xs font-medium border border-slate-200 text-slate-600 hover:bg-slate-50 rounded-xl transition-colors"
             >
               বন্ধ করুন
             </button>
             <Link
               to={`/outdoor/invoice/print/${invoiceId}`}
-              className="flex-1 py-2 font-['IBM_Plex_Mono'] text-xs uppercase border border-[#1E4FA0] text-[#1E4FA0] hover:bg-[#1E4FA0] hover:text-white rounded-[2px] transition-colors text-center"
+              className="flex-1 py-2.5 text-xs font-semibold border border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white rounded-xl transition-colors text-center"
             >
               ইনভয়েস খুলুন
             </Link>
@@ -1190,7 +1132,7 @@ export const InvoiceDetailsModal = ({
               <Link
                 to="/report"
                 state={{ invoiceId }}
-                className="flex-1 py-2 font-['IBM_Plex_Mono'] text-xs uppercase border border-[#C0312B] text-[#C0312B] hover:bg-[#C0312B] hover:text-white rounded-[2px] transition-colors text-center flex items-center justify-center gap-1.5"
+                className="flex-1 py-2.5 text-xs font-semibold border border-red-600 text-red-600 hover:bg-red-600 hover:text-white rounded-xl transition-colors text-center flex items-center justify-center gap-1.5"
               >
                 <FlaskConical className="w-3 h-3" /> রিপোর্ট
               </Link>
@@ -1235,26 +1177,24 @@ export const EditPatientModal = ({ invoice, isOpen, onClose, onSaved, onLoadingC
   };
 
   const inputCls =
-    "w-full pl-9 pr-3 py-2.5 text-sm border border-[#D8D5CB] rounded-[2px] focus:outline-none focus:ring-1 focus:ring-[#1E4FA0]/30 focus:border-[#1E4FA0] transition-all placeholder-[#A8ACA3] bg-[#FAF9F5] focus:bg-white font-['IBM_Plex_Mono']";
+    "w-full pl-10 pr-3 py-3 text-base border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all bg-slate-50 focus:bg-white";
   const set = (field) => (e) => setForm((p) => ({ ...p, [field]: e.target.value }));
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} size="sm">
-      <div className="flex items-center justify-between px-5 pt-5 pb-4 border-b border-[#E3E0D6] bg-[#FAF9F5]">
+      <div className="flex items-center justify-between px-5 pt-5 pb-4 border-b border-slate-100">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-[3px] border border-[#D8D5CB] flex items-center justify-center shrink-0 bg-white">
-            <User className="w-4 h-4 text-[#1E4FA0]" />
+          <div className="w-9 h-9 rounded-xl bg-blue-50 flex items-center justify-center shrink-0">
+            <User className="w-4 h-4 text-blue-600" />
           </div>
           <div>
-            <h2 className="font-['IBM_Plex_Sans'] text-sm font-bold text-[#1C1F1E] leading-tight">
-              রোগীর তথ্য সম্পাদনা
-            </h2>
-            <p className="font-['IBM_Plex_Mono'] text-[10px] text-[#A8ACA3] mt-0.5">Invoice #{invoice?.invoiceId}</p>
+            <h2 className="text-sm font-bold text-slate-900 leading-tight">রোগীর তথ্য সম্পাদনা</h2>
+            <p className="text-xs text-slate-400 mt-0.5">Invoice #{invoice?.invoiceId}</p>
           </div>
         </div>
         <button
           onClick={onClose}
-          className="w-7 h-7 flex items-center justify-center rounded-sm text-[#A8ACA3] hover:text-[#1C1F1E] hover:bg-[#EDEBE3] transition-colors"
+          className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-400 hover:text-slate-900 hover:bg-slate-100 transition-colors"
         >
           <X className="w-4 h-4" />
         </button>
@@ -1272,10 +1212,10 @@ export const EditPatientModal = ({ invoice, isOpen, onClose, onSaved, onLoadingC
             {["male", "female", "other"].map((g) => (
               <label
                 key={g}
-                className={`flex-1 flex items-center justify-center py-2 rounded-[2px] border cursor-pointer font-['IBM_Plex_Mono'] text-xs uppercase tracking-wide transition-all select-none ${
+                className={`flex-1 flex items-center justify-center py-2.5 rounded-xl border cursor-pointer text-xs font-medium capitalize transition-all select-none ${
                   form.gender === g
-                    ? "border-[#1E4FA0] bg-[#1E4FA0]/5 text-[#1E4FA0]"
-                    : "border-[#D8D5CB] bg-[#FAF9F5] text-[#6F756F] hover:border-[#A8ACA3] hover:bg-white"
+                    ? "border-blue-600 bg-blue-50 text-blue-600"
+                    : "border-slate-200 bg-slate-50 text-slate-500 hover:border-slate-300 hover:bg-white"
                 }`}
               >
                 <input
@@ -1297,6 +1237,7 @@ export const EditPatientModal = ({ invoice, isOpen, onClose, onSaved, onLoadingC
             <IconWrap icon={Calendar}>
               <input
                 type="number"
+                inputMode="numeric"
                 value={form.age}
                 onChange={set("age")}
                 className={inputCls}
@@ -1310,6 +1251,7 @@ export const EditPatientModal = ({ invoice, isOpen, onClose, onSaved, onLoadingC
             <IconWrap icon={Phone}>
               <input
                 type="tel"
+                inputMode="tel"
                 value={form.contactNumber}
                 onChange={set("contactNumber")}
                 className={inputCls}
@@ -1320,17 +1262,17 @@ export const EditPatientModal = ({ invoice, isOpen, onClose, onSaved, onLoadingC
         </div>
       </div>
 
-      <div className="flex gap-2 px-5 pb-5 border-t border-[#E3E0D6] pt-4">
+      <div className="flex gap-2 px-5 pb-5 pt-1">
         <button
           onClick={onClose}
-          className="flex-1 py-2 font-['IBM_Plex_Mono'] text-xs uppercase border border-[#D8D5CB] text-[#6F756F] hover:bg-[#EDEBE3] rounded-[2px] transition-colors"
+          className="flex-1 py-3 text-sm font-medium border border-slate-200 text-slate-600 hover:bg-slate-50 rounded-xl transition-colors"
         >
           বাতিল
         </button>
         <button
           onClick={handleSubmit}
           disabled={!isValid}
-          className="flex-1 py-2 font-['IBM_Plex_Mono'] text-xs uppercase border border-[#0F6E5C] text-[#0F6E5C] hover:bg-[#0F6E5C] hover:text-white disabled:opacity-40 disabled:cursor-not-allowed rounded-[2px] transition-colors"
+          className="flex-1 py-3 text-sm font-semibold bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed rounded-xl transition-colors"
         >
           সংরক্ষণ করুন
         </button>
@@ -1342,36 +1284,36 @@ export const EditPatientModal = ({ invoice, isOpen, onClose, onSaved, onLoadingC
 // ─── Shared Modal Primitives ──────────────────────────────────────────────────
 
 const ManifestBlock = ({ icon: Icon, label, badge, children }) => (
-  <div className="bg-[#FAF9F5] border border-[#E3E0D6] rounded-[3px] p-4">
+  <div className="bg-slate-50 border border-slate-100 rounded-xl p-3.5">
     <div className="flex items-center justify-between mb-3">
       <div className="flex items-center gap-2">
-        <Icon className="w-3.5 h-3.5 text-[#0F6E5C]" />
-        <span className="font-['IBM_Plex_Mono'] text-[10px] uppercase tracking-wide text-[#6F756F]">{label}</span>
+        <Icon className="w-3.5 h-3.5 text-emerald-600" />
+        <span className="text-[10px] uppercase tracking-wide text-slate-500 font-medium">{label}</span>
       </div>
-      {badge !== undefined && <span className="font-['IBM_Plex_Mono'] text-[10px] text-[#A8ACA3]">{badge}টি</span>}
+      {badge !== undefined && <span className="text-[10px] text-slate-400">{badge}টি</span>}
     </div>
     {children}
   </div>
 );
 
-const ManifestField = ({ label, value, valueClass = "text-[#1C1F1E]" }) => (
+const ManifestField = ({ label, value, valueClass = "text-slate-900" }) => (
   <div>
-    <p className="font-['IBM_Plex_Mono'] text-[10px] uppercase text-[#A8ACA3] mb-0.5">{label}</p>
-    <p className={`font-['IBM_Plex_Sans'] font-semibold text-xs leading-snug ${valueClass}`}>{value}</p>
+    <p className="text-[10px] uppercase text-slate-400 mb-0.5">{label}</p>
+    <p className={`font-semibold text-xs leading-snug ${valueClass}`}>{value}</p>
   </div>
 );
 
-const LedgerPayRow = ({ label, value, valueClass = "text-[#1C1F1E]" }) => (
+const LedgerPayRow = ({ label, value, valueClass = "text-slate-900" }) => (
   <div className="flex items-baseline gap-2">
-    <span className="text-[#6F756F] flex-1">{label}</span>
-    <span className="flex-1 border-b border-dotted border-[#D8D5CB] translate-y-[-3px]" />
+    <span className="text-slate-500 flex-1">{label}</span>
+    <span className="flex-1 border-b border-dotted border-slate-200 translate-y-[-3px]" />
     <span className={`shrink-0 ${valueClass}`}>{value}</span>
   </div>
 );
 
 const ManifestStatusBadge = ({ active, activeClass, inactiveClass, icon: Icon, activeLabel, inactiveLabel }) => (
   <span
-    className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-[2px] font-['IBM_Plex_Mono'] text-[10px] uppercase tracking-wide border ${active ? activeClass : inactiveClass}`}
+    className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-[10px] font-semibold uppercase tracking-wide border ${active ? activeClass : inactiveClass}`}
   >
     <Icon className="w-3.5 h-3.5" />
     {active ? activeLabel : inactiveLabel}
@@ -1380,9 +1322,9 @@ const ManifestStatusBadge = ({ active, activeClass, inactiveClass, icon: Icon, a
 
 const EditField = ({ label, required, children }) => (
   <div>
-    <label className="block font-['IBM_Plex_Mono'] text-[10px] uppercase text-[#6F756F] mb-1.5">
+    <label className="block text-xs font-medium text-slate-500 mb-1.5">
       {label}
-      {required && <span className="text-[#C0312B] ml-0.5">*</span>}
+      {required && <span className="text-red-500 ml-0.5">*</span>}
     </label>
     {children}
   </div>
@@ -1390,30 +1332,35 @@ const EditField = ({ label, required, children }) => (
 
 const IconWrap = ({ icon: Icon, children }) => (
   <div className="relative">
-    <Icon className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[#A8ACA3] pointer-events-none" />
+    <Icon className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
     {children}
   </div>
 );
 
-// ─── Skeleton ─────────────────────────────────────────────────────────────────
+// ─── Skeletons ─────────────────────────────────────────────────────────────────
 
-const SkeletonManifest = () => (
-  <div className="bg-white border border-[#E3E0D6] rounded-lg overflow-hidden animate-pulse">
-    <div className="h-[3px] bg-[#E3E0D6]" />
-    <div className="px-6 sm:px-8 pt-5 pb-4 border-b border-[#E3E0D6] space-y-2">
-      <div className="h-2.5 w-32 bg-[#ECE9DF] rounded-sm mx-auto" />
-      <div className="h-4 w-48 bg-[#ECE9DF] rounded-sm mx-auto" />
-    </div>
-    <div className="px-6 sm:px-8 pt-6 pb-5 border-b border-[#E3E0D6] space-y-2">
-      <div className="h-2.5 w-24 bg-[#ECE9DF] rounded-sm" />
-      <div className="h-6 w-48 bg-[#ECE9DF] rounded-sm" />
-      <div className="h-3 w-36 bg-[#ECE9DF] rounded-sm" />
+const SkeletonList = () => (
+  <div className="space-y-3 animate-pulse">
+    <div className="bg-white rounded-2xl border border-slate-200 p-4 space-y-3">
+      <div className="h-4 w-40 bg-slate-100 rounded" />
+      <div className="grid grid-cols-3 gap-2">
+        {[0, 1, 2].map((i) => (
+          <div key={i} className="h-12 bg-slate-100 rounded-xl" />
+        ))}
+      </div>
     </div>
     {[0, 1, 2, 3].map((i) => (
-      <div key={i} className="px-6 sm:px-8 py-3 border-b border-[#EDEBE3] flex items-center gap-3">
-        <div className="h-3 w-5 bg-[#ECE9DF] rounded-sm" />
-        <div className="h-3 flex-1 bg-[#ECE9DF] rounded-sm" />
-        <div className="h-3 w-20 bg-[#ECE9DF] rounded-sm" />
+      <div key={i} className="bg-white rounded-2xl border border-slate-200 p-4 space-y-3">
+        <div className="flex justify-between">
+          <div className="h-4 w-32 bg-slate-100 rounded" />
+          <div className="h-4 w-20 bg-slate-100 rounded" />
+        </div>
+        <div className="h-8 bg-slate-100 rounded-xl" />
+        <div className="flex gap-1.5">
+          <div className="h-7 w-16 bg-slate-100 rounded-lg" />
+          <div className="h-7 w-16 bg-slate-100 rounded-lg" />
+          <div className="h-7 w-16 bg-slate-100 rounded-lg" />
+        </div>
       </div>
     ))}
   </div>
@@ -1421,23 +1368,23 @@ const SkeletonManifest = () => (
 
 const DetailsSkeleton = () => (
   <div className="space-y-4 animate-pulse">
-    <div className="bg-[#FAF9F5] border border-[#E3E0D6] rounded-[3px] p-4 space-y-3">
-      <div className="h-3 bg-[#ECE9DF] rounded w-1/3" />
+    <div className="bg-slate-50 border border-slate-100 rounded-xl p-4 space-y-3">
+      <div className="h-3 bg-slate-100 rounded w-1/3" />
       <div className="grid grid-cols-2 gap-3">
         {[1, 2, 3, 4].map((i) => (
           <div key={i} className="space-y-1.5">
-            <div className="h-2 bg-[#ECE9DF] rounded w-1/2" />
-            <div className="h-3 bg-[#ECE9DF] rounded w-3/4" />
+            <div className="h-2 bg-slate-100 rounded w-1/2" />
+            <div className="h-3 bg-slate-100 rounded w-3/4" />
           </div>
         ))}
       </div>
     </div>
-    <div className="bg-[#FAF9F5] border border-[#E3E0D6] rounded-[3px] p-4 space-y-2">
-      <div className="h-3 bg-[#ECE9DF] rounded w-1/4" />
+    <div className="bg-slate-50 border border-slate-100 rounded-xl p-4 space-y-2">
+      <div className="h-3 bg-slate-100 rounded w-1/4" />
       {[1, 2].map((i) => (
         <div key={i} className="flex justify-between items-center">
-          <div className="h-3 bg-[#ECE9DF] rounded w-1/2" />
-          <div className="h-3 bg-[#ECE9DF] rounded w-1/5" />
+          <div className="h-3 bg-slate-100 rounded w-1/2" />
+          <div className="h-3 bg-slate-100 rounded w-1/5" />
         </div>
       ))}
     </div>
