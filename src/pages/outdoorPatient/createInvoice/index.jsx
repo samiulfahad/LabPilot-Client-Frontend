@@ -789,7 +789,7 @@ const InvoiceForm = ({
           </div>
 
           <div className="md:col-span-2">
-            <Field label="Referred By" optional>
+            <Field label="Media(কমিশন ভোগকারী)" optional>
               <div className="relative">
                 <div className="relative">
                   <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 z-10" />
