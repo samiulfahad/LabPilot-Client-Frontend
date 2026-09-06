@@ -531,7 +531,7 @@ const OutdoorReceipt = ({ summary, expenseSummary, timeRange, labName, labAddres
 
   const [commissionView, setCommissionView] = useState("percentage");
   const commissionValue = commissionView === "percentage" ? d.referrerCommission : d.referrerCommissionTestWise;
-  const netAmount = grossCounterAmount - (commissionValue ?? 0);
+  const netAmount = grossCounterAmount - (commissionValue ?? 0) - (e.totalExpense ?? 0);
 
   const [deletedOpen, setDeletedOpen] = useState(false);
   const [deletedInvoices, setDeletedInvoices] = useState(null);
@@ -631,11 +631,7 @@ const OutdoorReceipt = ({ summary, expenseSummary, timeRange, labName, labAddres
           </div>
         </div>
 
-        <SectionDivider label="নিট টোটাল থেকে মোট কমিশন বাদ দেওয়ার পর" />
-
-        <NetStamp amount={netAmount} label="নিট আয়" accent={TEAL} />
-
-        <div className="border border-[#E3D9EE] rounded-sm overflow-hidden mt-3 mb-3">
+        <div className="border border-[#E3D9EE] rounded-sm overflow-hidden mb-4">
           <div
             className="flex items-center justify-between px-4 py-3 bg-[#F8F5FC] border-l-4"
             style={{ borderColor: VIOLET }}
@@ -645,12 +641,16 @@ const OutdoorReceipt = ({ summary, expenseSummary, timeRange, labName, labAddres
               <p className="text-sm font-semibold text-[#1C1F1E] font-noto">মোট খরচ</p>
             </div>
             <p className="font-['IBM_Plex_Mono'] text-lg font-bold tabular-nums" style={{ color: VIOLET }}>
-              ৳{fmt(e.totalExpense)}
+              − ৳{fmt(e.totalExpense)}
             </p>
           </div>
         </div>
 
-        <div className="mt-0 mb-0">
+        <SectionDivider label="নিট টোটাল থেকে মোট কমিশন ও খরচ বাদ দেওয়ার পর" />
+
+        <NetStamp amount={netAmount} label="নিট আয়" accent={TEAL} />
+
+        <div className="mt-3 mb-0">
           <button
             type="button"
             onClick={toggleDeleted}
@@ -1441,7 +1441,7 @@ const CashMemo = () => {
 
         <p className="font-['IBM_Plex_Mono'] text-center text-xs text-[#A8ACA3] mt-4 pb-6 no-print font-noto">
           {activeTab === "outdoor"
-            ? "নিট আয় = মোট পরিমাণ − ল্যাব সমন্বয় − রেফারার ডিস্কাউন্ট − কমিশন + অনলাইন ইনভয়েস ফি"
+            ? "নিট আয় = মোট পরিমাণ − ল্যাব সমন্বয় − রেফারার ডিস্কাউন্ট − কমিশন − খরচ + অনলাইন ইনভয়েস ফি"
             : activeTab === "indoor"
               ? "মোট বিল = এই সময়কালে যোগ করা আইটেম | বকেয়া তালিকা = বর্তমান মুহূর্তের হিসাব | ডিলিট = ডিলিটের সময় অনুযায়ী"
               : "সারসংক্ষেপ = সকল বিভাগের বিলিং, আদায় ও খরচের একত্রিত চিত্র"}
