@@ -539,22 +539,9 @@ const EmptySection = ({ label }) => (
   <p className="font-['IBM_Plex_Mono'] text-xs text-[#A8ACA3] py-3 font-noto">{label}</p>
 );
 
-// ─── View toggle ──────────────────────────────────────────────────────────────
-
+// ─── View toggle — রোগী ভিত্তিক (ledger) first, টেস্ট ভিত্তিক (testwise) second ─
 const ViewToggle = ({ view, onChange }) => (
   <div className="flex items-center gap-1 p-0.5 bg-[#F0EDE5] rounded-sm border border-[#E3E0D6]">
-    <button
-      onClick={() => onChange("testwise")}
-      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-[3px] font-['IBM_Plex_Mono'] text-xs uppercase transition-all font-noto ${
-        view === "testwise"
-          ? "bg-white text-[#1C1F1E] shadow-[0_1px_2px_rgba(28,31,30,0.08)]"
-          : "text-[#8A8F89] hover:text-[#1C1F1E]"
-      }`}
-    >
-      <FlaskConical className="w-3 h-3" />
-      টেস্ট ভিত্তিক কমিশন
-    </button>
-
     <button
       onClick={() => onChange("ledger")}
       className={`flex items-center gap-1.5 px-3 py-1.5 rounded-[3px] font-['IBM_Plex_Mono'] text-xs uppercase transition-all font-noto ${
@@ -565,6 +552,18 @@ const ViewToggle = ({ view, onChange }) => (
     >
       <LayoutList className="w-3 h-3" />
       রোগী ভিত্তিক কমিশন
+    </button>
+
+    <button
+      onClick={() => onChange("testwise")}
+      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-[3px] font-['IBM_Plex_Mono'] text-xs uppercase transition-all font-noto ${
+        view === "testwise"
+          ? "bg-white text-[#1C1F1E] shadow-[0_1px_2px_rgba(28,31,30,0.08)]"
+          : "text-[#8A8F89] hover:text-[#1C1F1E]"
+      }`}
+    >
+      <FlaskConical className="w-3 h-3" />
+      টেস্ট ভিত্তিক কমিশন
     </button>
   </div>
 );
@@ -992,7 +991,7 @@ const CommissionReport = () => {
   const [popup, setPopup] = useState(null);
   const [offlinePopup, setOfflinePopup] = useState(false); // ← new
   const [timeRange, setTimeRange] = useState(null);
-  const [view, setView] = useState("testwise");
+  const [view, setView] = useState("ledger");
   const [permissionDenied, setPermissionDenied] = useState(false);
 
   // Guards against double-tap / re-entrant prints across re-renders — a

@@ -245,51 +245,11 @@ const SummarySection = ({ title, icon: Icon, accent, rows, badge }) => (
   </div>
 );
 
-const CommissionToggle = ({ view, onChange, accent = "#B5772A" }) => (
-  <div className="flex items-center gap-1 shrink-0 no-print">
-    <button
-      type="button"
-      onClick={() => onChange("percentage")}
-      className="font-['IBM_Plex_Mono'] text-[10px] uppercase px-2 py-1 rounded-sm border transition-colors font-noto"
-      style={
-        view === "percentage"
-          ? { color: "#fff", backgroundColor: accent, borderColor: accent }
-          : { color: accent, borderColor: `${accent}40`, backgroundColor: "transparent" }
-      }
-    >
-      রোগী ভিত্তিক
-    </button>
-    <button
-      type="button"
-      onClick={() => onChange("testWise")}
-      className="font-['IBM_Plex_Mono'] text-[10px] uppercase px-2 py-1 rounded-sm border transition-colors font-noto"
-      style={
-        view === "testWise"
-          ? { color: "#fff", backgroundColor: accent, borderColor: accent }
-          : { color: accent, borderColor: `${accent}40`, backgroundColor: "transparent" }
-      }
-    >
-      টেস্ট ভিত্তিক
-    </button>
-  </div>
-);
-
 const TEAL = "#0F6E5C";
 const OCHRE = "#B5772A";
 const RUST = "#B23A2E";
 const INDIGO = "#3730A3";
 const VIOLET = "#7C3AED";
-
-const COMMISSION_VIEW_LABELS = { percentage: "Patient Based", testWise: "Test Based" };
-
-const CommissionBasisBadge = ({ view, accent = OCHRE }) => (
-  <span
-    className="font-['IBM_Plex_Mono'] text-[10px] uppercase px-1.5 py-[1px] rounded-[2px] font-noto border shrink-0"
-    style={{ color: accent, borderColor: `${accent}40`, backgroundColor: `${accent}10` }}
-  >
-    {COMMISSION_VIEW_LABELS[view]}
-  </span>
-);
 
 const DiscountPatientsInline = ({ loading, patients }) => (
   <div className="border border-t-0 border-[#E3D9C6] rounded-b-sm bg-[#FFFDF9] overflow-hidden">
@@ -529,9 +489,7 @@ const OutdoorReceipt = ({ summary, expenseSummary, timeRange, labName, labAddres
     (d.initial ?? 0) - (d.labAdjustment ?? 0) - (d.referrerDiscount ?? 0) + (d.totalInvoiceFee ?? 0);
   const eyebrowLabel = isHospital ? "বহির্বিভাগ ক্যাশ মেমু" : "ক্যাশ মেমু";
 
-  const [commissionView, setCommissionView] = useState("percentage");
-  const commissionValue = commissionView === "percentage" ? d.referrerCommission : d.referrerCommissionTestWise;
-  const netAmount = grossCounterAmount - (commissionValue ?? 0) - (e.totalExpense ?? 0);
+  const netAmount = grossCounterAmount - (e.totalExpense ?? 0);
 
   const [deletedOpen, setDeletedOpen] = useState(false);
   const [deletedInvoices, setDeletedInvoices] = useState(null);
@@ -614,23 +572,6 @@ const OutdoorReceipt = ({ summary, expenseSummary, timeRange, labName, labAddres
 
         <PaymentModeBreakdown breakdown={d.paymentModeBreakdown} />
 
-        <div className="border border-[#E3D9C6] rounded-sm overflow-hidden mb-4">
-          <div className="px-4 py-3 bg-[#FBF7EF] border-l-4" style={{ borderColor: OCHRE }}>
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2">
-                <p className="text-sm font-semibold text-[#1C1F1E] font-noto">মোট কমিশন</p>
-                <CommissionBasisBadge view={commissionView} accent={OCHRE} />
-              </div>
-              <p className="font-['IBM_Plex_Mono'] text-lg font-bold tabular-nums shrink-0" style={{ color: OCHRE }}>
-                − ৳{fmt(commissionValue)}
-              </p>
-            </div>
-            <div className="mt-2">
-              <CommissionToggle view={commissionView} onChange={setCommissionView} accent={OCHRE} />
-            </div>
-          </div>
-        </div>
-
         <div className="border border-[#E3D9EE] rounded-sm overflow-hidden mb-4">
           <div
             className="flex items-center justify-between px-4 py-3 bg-[#F8F5FC] border-l-4"
@@ -646,7 +587,7 @@ const OutdoorReceipt = ({ summary, expenseSummary, timeRange, labName, labAddres
           </div>
         </div>
 
-        <SectionDivider label="নিট টোটাল থেকে মোট কমিশন ও খরচ বাদ দেওয়ার পর" />
+        <SectionDivider label="নিট টোটাল থেকে খরচ বাদ দেওয়ার পর" />
 
         <NetStamp amount={netAmount} label="নিট আয়" accent={TEAL} />
 
@@ -1026,9 +967,6 @@ const SummaryReceipt = ({
   const e = expenseSummary ?? {};
   const headingLabel = buildHeadingLabel(timeRange?.start, timeRange?.end);
 
-  const [commissionView, setCommissionView] = useState("percentage");
-  const outdoorCommissionValue = commissionView === "percentage" ? o.referrerCommission : o.referrerCommissionTestWise;
-
   const outdoorGrossCounterAmount =
     (o.initial ?? 0) - (o.labAdjustment ?? 0) - (o.referrerDiscount ?? 0) + (o.totalInvoiceFee ?? 0);
 
@@ -1081,23 +1019,6 @@ const SummaryReceipt = ({
         />
 
         <PaymentModeBreakdown breakdown={o.paymentModeBreakdown} />
-
-        <div className="border border-[#E3D9C6] rounded-sm overflow-hidden mb-4">
-          <div className="px-4 py-3 border-l-4" style={{ backgroundColor: `${OCHRE}08`, borderColor: OCHRE }}>
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2">
-                <p className="text-sm font-semibold text-[#1C1F1E] font-noto">রেফারার কমিশন (বহির্বিভাগ)</p>
-                <CommissionBasisBadge view={commissionView} accent={OCHRE} />
-              </div>
-              <p className="font-['IBM_Plex_Mono'] text-lg font-bold tabular-nums shrink-0" style={{ color: OCHRE }}>
-                − ৳{fmt(outdoorCommissionValue)}
-              </p>
-            </div>
-            <div className="mt-2">
-              <CommissionToggle view={commissionView} onChange={setCommissionView} accent={OCHRE} />
-            </div>
-          </div>
-        </div>
 
         {isHospital && (
           <>
@@ -1441,7 +1362,7 @@ const CashMemo = () => {
 
         <p className="font-['IBM_Plex_Mono'] text-center text-xs text-[#A8ACA3] mt-4 pb-6 no-print font-noto">
           {activeTab === "outdoor"
-            ? "নিট আয় = মোট পরিমাণ − ল্যাব সমন্বয় − রেফারার ডিস্কাউন্ট − কমিশন − খরচ + অনলাইন ইনভয়েস ফি"
+            ? "নিট আয় = মোট পরিমাণ − ল্যাব সমন্বয় − রেফারার ডিস্কাউন্ট − খরচ + অনলাইন ইনভয়েস ফি"
             : activeTab === "indoor"
               ? "মোট বিল = এই সময়কালে যোগ করা আইটেম | বকেয়া তালিকা = বর্তমান মুহূর্তের হিসাব | ডিলিট = ডিলিটের সময় অনুযায়ী"
               : "সারসংক্ষেপ = সকল বিভাগের বিলিং, আদায় ও খরচের একত্রিত চিত্র"}
