@@ -95,6 +95,23 @@ const getPricingFlags = ({ amount, doctor }) => {
   };
 };
 
+// Lab name can be arbitrarily long (multi-branch names, English+Bangla mixes).
+// Instead of truncating with an ellipsis, shrink the font a step at a time and
+// let it wrap — never crop. Same thresholds reused for the PDF (point sizes).
+const getLabNameHtmlSizeClass = (name) => {
+  const len = name?.length || 0;
+  if (len > 40) return "text-xs";
+  if (len > 26) return "text-sm";
+  return "text-base";
+};
+
+const getLabNamePdfFontSize = (name) => {
+  const len = name?.length || 0;
+  if (len > 40) return 7.5;
+  if (len > 26) return 8.5;
+  return 10;
+};
+
 // ── Axios‑native network error detection (same as all other pages) ──────────
 const isNetworkError = (err) => err?.isAxiosError === true && !err.response;
 
@@ -112,7 +129,7 @@ const pdf$ = StyleSheet.create({
     alignItems: "flex-start",
   },
   headerLeft: { flex: 1, marginRight: 10 },
-  logoRow: { flexDirection: "row", alignItems: "center", marginBottom: 6 },
+  logoRow: { flexDirection: "row", alignItems: "flex-start", marginBottom: 6 },
   logoBox: {
     width: 26,
     height: 26,
@@ -123,7 +140,10 @@ const pdf$ = StyleSheet.create({
     marginRight: 8,
   },
   logoText: { color: "#ffffff", fontFamily: "Helvetica-Bold", fontSize: 10 },
-  labName: { color: "#111827", fontFamily: "Helvetica-Bold", fontSize: 10, maxWidth: 220 },
+  // fontSize is overridden per-invoice via getLabNamePdfFontSize; no maxWidth
+  // so react-pdf wraps naturally within the flex:1 headerLeft column instead
+  // of ever overlapping the invoice-ID badge on the right.
+  labName: { color: "#111827", fontFamily: "Helvetica-Bold" },
   poweredBy: { color: "#6b7280", fontSize: 6.5, marginTop: 1 },
   labSub: { color: "#6b7280", fontSize: 8 },
   headerMeta: { color: "#374151", fontSize: 7.5, marginTop: 2 },
@@ -223,8 +243,8 @@ const InvoicePDF = ({ invoice, qrCodeUrl, date, time, labInfo }) => {
               <View style={pdf$.logoBox}>
                 <Text style={pdf$.logoText}>LP</Text>
               </View>
-              <View>
-                <Text style={pdf$.labName}>{labInfo.name}</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={[pdf$.labName, { fontSize: getLabNamePdfFontSize(labInfo.name) }]}>{labInfo.name}</Text>
                 <Text style={pdf$.poweredBy}>Powered by LabPilot Pro</Text>
               </View>
             </View>
@@ -386,13 +406,17 @@ const InvoiceCard = ({ invoice, qrCodeUrl, date, time, labInfo }) => {
       {/* Header — white bg, black text */}
       <div className="bg-white border-b border-gray-200 px-6 py-5">
         <div className="flex items-start justify-between gap-4">
-          <div className="min-w-0">
-            <div className="flex items-center gap-3 mb-2">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-start gap-3 mb-2">
               <div className="w-9 h-9 shrink-0 bg-blue-600 rounded-xl flex items-center justify-center">
                 <span className="text-white font-bold text-sm">LP</span>
               </div>
               <div className="min-w-0">
-                <h1 className="text-base font-bold text-gray-900 leading-tight truncate max-w-[220px]">
+                <h1
+                  className={`font-bold text-gray-900 leading-tight break-words ${getLabNameHtmlSizeClass(
+                    labInfo.name,
+                  )}`}
+                >
                   {labInfo.name}
                 </h1>
                 <p className="text-gray-500 text-[10px] leading-tight">Powered by LabPilot Pro</p>
