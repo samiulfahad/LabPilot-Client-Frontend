@@ -228,14 +228,14 @@ const pdf$ = StyleSheet.create({
 
 // ─── PDF Document ─────────────────────────────────────────────────────────────
 
-const InvoicePDF = ({ invoice, qrCodeUrl, date, time, labInfo, orientation = "portrait" }) => {
+const InvoicePDF = ({ invoice, qrCodeUrl, date, time, labInfo }) => {
   const { patient, amount, tests, products, reportLink, invoiceId } = invoice;
   const flags = getPricingFlags(invoice);
   const hasProducts = products.length > 0;
 
   return (
     <Document>
-      <Page size="A5" orientation={orientation} style={pdf$.page}>
+      <Page size="A5" style={pdf$.page}>
         {/* Header */}
         <View style={pdf$.header}>
           <View style={pdf$.headerLeft}>
@@ -662,17 +662,10 @@ const PrintInvoice = () => {
 
   // ── PDF helpers ────────────────────────────────────────────────────────────
 
-  const buildPDF = (orientation = "portrait") => {
+  const buildPDF = () => {
     const { date, time } = formatDateTime(invoice.createdAt);
     return pdf(
-      <InvoicePDF
-        invoice={invoice}
-        qrCodeUrl={qrCodeUrl}
-        date={date}
-        time={time}
-        labInfo={labInfo}
-        orientation={orientation}
-      />,
+      <InvoicePDF invoice={invoice} qrCodeUrl={qrCodeUrl} date={date} time={time} labInfo={labInfo} />,
     ).toBlob();
   };
 
@@ -702,7 +695,7 @@ const PrintInvoice = () => {
   const handlePrint = async () => {
     try {
       setPrinting(true);
-      const url = URL.createObjectURL(await buildPDF("landscape"));
+      const url = URL.createObjectURL(await buildPDF());
       const iframe = Object.assign(document.createElement("iframe"), {
         src: url,
         style: "position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;border:0;",
