@@ -229,7 +229,7 @@ const DIAGNOSTIC_NAV = [
   {
     to: "/manage-referrers",
     icon: Users,
-    label: "রেফারার",
+    label: "মিডিয়া",
     color: "text-fuchsia-600",
     bg: "bg-fuchsia-50",
     module: "setup",

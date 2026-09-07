@@ -193,7 +193,7 @@ const ReferrerFormModal = ({ formData, onChange, onSubmit, onClose, saving, apiE
                 type="text"
                 value={formData.name || ""}
                 onChange={(e) => onChange("name", e.target.value)}
-                placeholder="রেফারারের নাম"
+                placeholder="মিডিয়ার নাম"
                 className={`${inputBase} px-3 py-2.5 text-sm`}
                 onFocus={focusInput}
                 onBlur={blurInput}
@@ -733,7 +733,7 @@ const ManageReferrer = () => {
   // ═══════ Front-end permission check ═══════
   const hasAccess = isAdmin || user?.permissions?.manageReferrers === true;
   if (!hasAccess) {
-    return <Popup type="denied" message="রেফারার ম্যানেজমেন্ট দেখার অনুমতি আপনার নেই।" onClose={() => navigate("/")} />;
+    return <Popup type="denied" message="মিডিয়া ম্যানেজমেন্ট দেখার অনুমতি আপনার নেই।" onClose={() => navigate("/")} />;
   }
 
   const [referrers, setReferrers] = useState([]);
@@ -758,7 +758,7 @@ const ManageReferrer = () => {
       if (isNetworkError(err)) {
         setOfflinePopup(true);
       } else {
-        setPopup({ type: "error", message: getErrorMessage(err, "রেফারার লোড করতে ব্যর্থ।") });
+        setPopup({ type: "error", message: getErrorMessage(err, "মিডিয়া লোড করতে ব্যর্থ।") });
       }
     } finally {
       setInitialLoading(false);
@@ -816,7 +816,7 @@ const ManageReferrer = () => {
     if (atReferrerLimit) {
       setPopup({
         type: "error",
-        message: `আপনার ল্যাবে সর্বোচ্চ ${maxReferrer} জন রেফারার যোগ করা যাবে। সীমা পূর্ণ হয়েছে। সীমা বাড়াতে আমাদের সাথে যোগাযোগ করুন।`,
+        message: `আপনার ল্যাবে সর্বোচ্চ ${maxReferrer} জন মিডিয়া যোগ করা যাবে। সীমা পূর্ণ হয়েছে। সীমা বাড়াতে আমাদের সাথে যোগাযোগ করুন।`,
       });
       return;
     }
@@ -838,7 +838,7 @@ const ManageReferrer = () => {
     // check remains the authoritative guard for direct API access.
     if (!isEdit && atReferrerLimit) {
       return setFormApiError(
-        `আপনার ল্যাবে সর্বোচ্চ ${maxReferrer} জন রেফারার যোগ করা যাবে। সীমা পূর্ণ হয়েছে। সীমা বাড়াতে আমাদের সাথে যোগাযোগ করুন।`,
+        `আপনার ল্যাবে সর্বোচ্চ ${maxReferrer} জন মিডিয়া যোগ করা যাবে। সীমা পূর্ণ হয়েছে। সীমা বাড়াতে আমাদের সাথে যোগাযোগ করুন।`,
       );
     }
 
@@ -863,7 +863,7 @@ const ManageReferrer = () => {
         });
       }
       await loadReferrers();
-      setPopup({ type: "success", message: isEdit ? "রেফারার আপডেট হয়েছে।" : "রেফারার নিবন্ধিত হয়েছে।" });
+      setPopup({ type: "success", message: isEdit ? "মিডিয়া আপডেট হয়েছে।" : "মিডিয়া নিবন্ধিত হয়েছে।" });
       setFormModal(null);
     } catch (err) {
       if (isNetworkError(err)) {
@@ -894,7 +894,7 @@ const ManageReferrer = () => {
     try {
       await referrerService.deleteReferrer(_id);
       setReferrers((prev) => prev.filter((r) => r._id !== _id));
-      setPopup({ type: "success", message: "রেফারার মুছে ফেলা হয়েছে।" });
+      setPopup({ type: "success", message: "মিডিয়া ডিলিট করে ফেলা হয়েছে।" });
     } catch (err) {
       if (isNetworkError(err)) {
         setOfflinePopup(true);
@@ -980,7 +980,7 @@ const ManageReferrer = () => {
             <button
               onClick={handleAddReferrerClick}
               disabled={atReferrerLimit}
-              title={atReferrerLimit ? `রেফারার সীমা (${maxReferrer}) পূর্ণ হয়েছে` : undefined}
+              title={atReferrerLimit ? `মিডিয়া সীমা (${maxReferrer}) পূর্ণ হয়েছে` : undefined}
               className="flex items-center gap-1.5 transition-all font-semibold px-4 py-2 rounded-xl text-white font-['IBM_Plex_Mono',monospace] text-xs border-none shadow-[0_4px_14px_rgba(99,102,241,0.4)] hover:shadow-[0_6px_20px_rgba(99,102,241,0.5)] disabled:opacity-60 disabled:shadow-none disabled:cursor-not-allowed"
               style={{ background: atReferrerLimit ? "#94A3B8" : "linear-gradient(135deg,#6366F1,#4F46E5)" }}
             >
@@ -1041,7 +1041,7 @@ const ManageReferrer = () => {
           <div className="flex items-start gap-2.5 px-3.5 py-2.5 mb-4 bg-[#FEF2F2] border-[1.5px] border-[#EF444430] rounded-xl">
             <Lock className="w-[13px] h-[13px] text-[#EF4444] mt-[1px] shrink-0" />
             <p className="text-[11px] leading-[1.5] text-[#991B1B] font-[Noto_Sans_Bengali,sans-serif]">
-              আপনার ল্যাবে সর্বোচ্চ {maxReferrer} জন রেফারার যোগ করা যাবে এবং আপনি সীমায় পৌঁছেছেন। নতুন রেফারার যোগ
+              আপনার ল্যাবে সর্বোচ্চ {maxReferrer} জন মিডিয়া যোগ করা যাবে এবং আপনি সীমায় পৌঁছেছেন। নতুন মিডিয়া যোগ
               করতে সীমা বাড়াতে আমাদের সাথে যোগাযোগ করুন।
             </p>
           </div>
@@ -1087,7 +1087,7 @@ const ManageReferrer = () => {
           <div className="flex flex-col items-center justify-center py-10 gap-2 text-[#94A3B8] bg-white border border-[#E2E8F0] rounded-2xl">
             <AlertCircle className="w-7 h-7 opacity-40" />
             <p className="font-['IBM_Plex_Mono',monospace] text-xs">
-              {hasFilters || search ? "কোনো রেফারার পাওয়া যায়নি" : "এখনো কোনো রেফারার যোগ করা হয়নি"}
+              {hasFilters || search ? "কোনো মিডিয়া পাওয়া যায়নি" : "এখনো কোনো মিডিয়া যোগ করা হয়নি"}
             </p>
           </div>
         ) : (
@@ -1107,7 +1107,7 @@ const ManageReferrer = () => {
 
         {/* Footer note */}
         <p className="font-['IBM_Plex_Mono',monospace] text-[10px] text-[#94A3B8] mt-4 text-center">
-          * সকল রেফারারের কমিশন প্রযোজ্য
+          * সকল মিডিয়ার কমিশন প্রযোজ্য
         </p>
       </div>
     </section>

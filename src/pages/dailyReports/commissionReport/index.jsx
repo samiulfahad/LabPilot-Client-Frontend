@@ -805,7 +805,7 @@ const TestWiseView = ({ registered, unregistered, headingLabel, timeRange, lab, 
           <h2 className="font-['IBM_Plex_Sans'] text-2xl font-semibold text-[#1C1F1E] font-noto">{headingLabel}</h2>
 
           <div className="flex flex-nowrap divide-x divide-[#E3E0D6] mt-2">
-            <HeaderStat label="রেফারার" value={`${fmt(rows.length)} জন`} accent={TEAL} />
+            <HeaderStat label="মিডিয়া" value={`${fmt(rows.length)} জন`} accent={TEAL} />
             {isHospital && (
               <>
                 <HeaderStat label="আউটডোর" value={fmt(totalOutdoorOccurrences)} />
@@ -873,7 +873,7 @@ const LedgerView = ({ d, headingLabel, timeRange, referrerCount, lab, isHospital
         <h2 className="font-['IBM_Plex_Sans'] text-2xl font-semibold text-[#1C1F1E] font-noto">{headingLabel}</h2>
 
         <div className="flex flex-nowrap divide-x divide-[#E3E0D6] mt-2">
-          <HeaderStat label="রেফারার" value={`${fmt(referrerCount)} জন`} accent={TEAL} />
+          <HeaderStat label="মিডিয়া" value={`${fmt(referrerCount)} জন`} accent={TEAL} />
           <HeaderStat label="ইনভয়েস" value={`${fmt(d.totals.totalInvoices)} টি`} />
         </div>
       </div>
@@ -899,7 +899,7 @@ const LedgerView = ({ d, headingLabel, timeRange, referrerCount, lab, isHospital
     </div>
 
     <div className="px-6 sm:px-8 py-5 border-b border-[#E3E0D6]">
-      <p className="font-['IBM_Plex_Mono'] text-xs uppercase text-[#6F756F] mb-1 font-noto">নিবন্ধিত রেফারার</p>
+      <p className="font-['IBM_Plex_Mono'] text-xs uppercase text-[#6F756F] mb-1 font-noto">নিবন্ধিত মিডিয়া</p>
       {d.registered.length > 0 ? (
         d.registered.map((r) => {
           const meta = TYPE_META[r.type] ?? TYPE_META.unknown;
@@ -919,7 +919,7 @@ const LedgerView = ({ d, headingLabel, timeRange, referrerCount, lab, isHospital
           );
         })
       ) : (
-        <EmptySection label="এই সময়সীমায় কোনো নিবন্ধিত রেফারার নেই" />
+        <EmptySection label="এই সময়সীমায় কোনো নিবন্ধিত মিডিয়া নেই" />
       )}
     </div>
 

@@ -39,7 +39,7 @@ const reportNav = [
     label: "কমিশন রিপোর্ট",
     path: "/commission-report",
     icon: Percent,
-    description: "রেফারার কমিশনের হিসাব",
+    description: "মিডিয়া কমিশনের হিসাব",
     color: "amber",
     permission: "commissionReport",
   },

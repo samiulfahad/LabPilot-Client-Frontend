@@ -974,7 +974,7 @@ export const InvoiceDetailsModal = ({
 
             {/* Referrer */}
             {hasReferrer && (
-              <ManifestBlock icon={User} label="রেফারার">
+              <ManifestBlock icon={User} label="মিডিয়া">
                 <div className="grid grid-cols-2 gap-x-4 gap-y-3">
                   <ManifestField label="Name" value={referrer.name || "—"} />
                   {referrer.type && (

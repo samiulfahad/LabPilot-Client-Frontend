@@ -549,7 +549,7 @@ const OutdoorReceipt = ({ summary, expenseSummary, timeRange, labName, labAddres
         <div className="divide-y divide-[#F0EEE6]">
           <ReceiptLine label="মোট বিক্রি" value={`৳${fmt(d.initial)}`} bold />
           <ReceiptLine label="ল্যাব ডিস্কাউন্ট/অ্যাডজাস্টমেন্ট" value={`− ৳${fmt(d.labAdjustment)}`} tone={OCHRE} />
-          <ReceiptLine label="রেফারার ডিস্কাউন্ট" value={`− ৳${fmt(d.referrerDiscount)}`} tone={OCHRE} />
+          <ReceiptLine label="মিডিয়া ডিস্কাউন্ট" value={`− ৳${fmt(d.referrerDiscount)}`} tone={OCHRE} />
           <ReceiptLine label="অনলাইন ইনভয়েস ফি" value={`+ ৳${fmt(d.totalInvoiceFee)}`} tone={TEAL} />
         </div>
 
@@ -837,7 +837,7 @@ const IndoorReceipt = ({ summary, timeRange, labName, labAddress, labPhone }) =>
             className="flex items-center justify-between px-4 py-3 bg-[#FBF7EF] border-l-4"
             style={{ borderColor: OCHRE }}
           >
-            <p className="text-sm font-semibold text-[#1C1F1E] font-noto">রেফারার কমিশন (টেস্ট ভিত্তিক)</p>
+            <p className="text-sm font-semibold text-[#1C1F1E] font-noto">মিডিয়া কমিশন (টেস্ট ভিত্তিক)</p>
             <p className="font-['IBM_Plex_Mono'] text-lg font-bold tabular-nums" style={{ color: OCHRE }}>
               − ৳{fmt(d.totalCommission)}
             </p>
@@ -982,7 +982,7 @@ const SummaryReceipt = ({
     { label: "মোট বিল", value: `৳${fmt(i.totalBilled)}`, bold: true },
     { label: "আদায়", value: `৳${fmt(i.totalCollected)}`, tone: TEAL },
     { label: "মোট ডিসকাউন্ট", value: `− ৳${fmt(i.totalDiscounts)}`, tone: OCHRE },
-    { label: "রেফারার কমিশন (টেস্ট ভিত্তিক)", value: `− ৳${fmt(i.totalCommission)}`, tone: OCHRE },
+    { label: "মিডিয়া কমিশন (টেস্ট ভিত্তিক)", value: `− ৳${fmt(i.totalCommission)}`, tone: OCHRE },
   ];
 
   const expenseRows = [{ label: "মোট খরচ", value: `৳${fmt(e.totalExpense)}`, bold: true, tone: VIOLET }];
@@ -1362,7 +1362,7 @@ const CashMemo = () => {
 
         <p className="font-['IBM_Plex_Mono'] text-center text-xs text-[#A8ACA3] mt-4 pb-6 no-print font-noto">
           {activeTab === "outdoor"
-            ? "নিট আয় = মোট পরিমাণ − ল্যাব সমন্বয় − রেফারার ডিস্কাউন্ট − খরচ + অনলাইন ইনভয়েস ফি"
+            ? "নিট আয় = মোট পরিমাণ − ল্যাব সমন্বয় − মিডিয়া ডিস্কাউন্ট − খরচ + অনলাইন ইনভয়েস ফি"
             : activeTab === "indoor"
               ? "মোট বিল = এই সময়কালে যোগ করা আইটেম | বকেয়া তালিকা = বর্তমান মুহূর্তের হিসাব | ডিলিট = ডিলিটের সময় অনুযায়ী"
               : "সারসংক্ষেপ = সকল বিভাগের বিলিং, আদায় ও খরচের একত্রিত চিত্র"}

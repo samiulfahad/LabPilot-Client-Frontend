@@ -504,13 +504,13 @@ const AdmitPatient = () => {
                       }`}
                     />
                   </div>
-                  <span className="text-sm text-slate-700">তত্ত্বাবধায়ক ডাক্তারকেই রেফারার হিসেবে ব্যবহার করুন</span>
+                  <span className="text-sm text-slate-700">তত্ত্বাবধায়ক ডাক্তারকেই মিডিয়া হিসেবে ব্যবহার করুন</span>
                 </label>
 
                 {!form.useDoctorAsReferrer && (
-                  <Field label="রেফারার" optional>
+                  <Field label="মিডিয়া" optional>
                     <Select value={form.referrerId} onChange={(e) => set("referrerId", e.target.value)}>
-                      <option value="">— রেফারার নেই —</option>
+                      <option value="">— মিডিয়া নেই —</option>
                       {reqData.referrers.map((r) => (
                         <option key={r._id} value={r._id}>
                           {r.name} ({r.type})

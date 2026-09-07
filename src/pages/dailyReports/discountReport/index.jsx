@@ -282,10 +282,10 @@ const DiscountRow = ({ entry, idx }) => {
             <span className="text-[#8A8F89]">
               · {CATEGORY_LABELS[entry.category] ?? entry.category}
               {entry.providedBy &&
-                ` (${entry.providedBy === "hospital" ? "হাসপাতাল" : entry.providedBy === "doctor" ? "ডাক্তার" : "রেফারার"})`}
+                ` (${entry.providedBy === "hospital" ? "হাসপাতাল" : entry.providedBy === "doctor" ? "ডাক্তার" : "মিডিয়া"})`}
             </span>
           )}
-          {entry.referrerName && <span className="text-[#8A8F89]">· রেফারার: {entry.referrerName}</span>}
+          {entry.referrerName && <span className="text-[#8A8F89]">· মিডিয়া: {entry.referrerName}</span>}
           {entry.staffName && <span className="text-[#8A8F89]">· স্টাফ: {entry.staffName}</span>}
         </p>
       </div>
@@ -623,7 +623,7 @@ const DiscountReport = () => {
                       : "bg-[#FAF9F5] border border-[#E3E0D6] text-[#6F756F]"
                   }`}
                 >
-                  রেফারার অনুযায়ী
+                  মিডিয়া অনুযায়ী
                 </button>
               </div>
             </div>
