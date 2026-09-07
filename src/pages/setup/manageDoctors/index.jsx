@@ -1181,17 +1181,6 @@ const ManageDoctors = () => {
               <h1 className="font-['IBM_Plex_Sans',sans-serif] text-[22px] font-bold text-[#0F172A] leading-tight">
                 ডাক্তার তালিকা
               </h1>
-              <p className="text-[13px] text-[#64748B] mt-0.5">
-                কমিশন ও রেফারেল ডাক্তার পরিচালনা।
-                {maxDoctor !== null && (
-                  <span
-                    className="ml-1.5 font-['IBM_Plex_Mono',monospace]"
-                    style={{ color: atDoctorLimit ? "#EF4444" : "#64748B" }}
-                  >
-                    ({pagination.total}/{maxDoctor} ব্যবহৃত)
-                  </span>
-                )}
-              </p>
             </div>
           </div>
           <div className="flex items-center gap-2">

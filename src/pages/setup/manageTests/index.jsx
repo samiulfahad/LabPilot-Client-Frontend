@@ -1293,7 +1293,6 @@ const ManageTests = () => {
               <h1 className="font-['IBM_Plex_Sans',sans-serif] text-[22px] font-bold text-[#0F172A] leading-tight">
                 টেস্ট ব্যবস্থাপনা
               </h1>
-              <p className="text-[13px] text-[#64748B] mt-0.5">মূল্য, কমিশন, ফরম্যাট ও অনলাইন স্ট্যাটাস পরিচালনা।</p>
             </div>
           </div>
           <div className="flex items-center gap-2">

@@ -1337,14 +1337,6 @@ const ManageStaff = () => {
               <h1 className="text-[22px] font-bold leading-tight" style={{ color: INK }}>
                 স্টাফ অ্যাকাউন্ট
               </h1>
-              <p className="text-[13px] mt-0.5" style={{ color: INK_MUTE }}>
-                অ্যাকাউন্ট ও অনুমতি পরিচালনা
-                {maxStaff !== null && (
-                  <span className={`ml-1.5 ${mono}`} style={{ color: atStaffLimit ? RUST : INK_MUTE }}>
-                    ({staffSeatCount}/{maxStaff} সিট ব্যবহৃত)
-                  </span>
-                )}
-              </p>
             </div>
           </div>
           <div className="flex items-center gap-2">

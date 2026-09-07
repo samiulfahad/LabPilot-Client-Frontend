@@ -1529,7 +1529,6 @@ export default function Products() {
               <h1 className="font-['IBM_Plex_Sans',sans-serif] text-[22px] font-bold text-[#0F172A] leading-tight">
                 পণ্য ব্যবস্থাপনা
               </h1>
-              <p className="text-[13px] text-[#64748B] mt-0.5">ওষুধ, পণ্য ও সেবা পরিচালনা করুন।</p>
             </div>
           </div>
           <div className="flex items-center gap-2">

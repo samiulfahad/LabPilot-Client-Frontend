@@ -958,16 +958,6 @@ const ManageReferrer = () => {
               <h1 className="font-['IBM_Plex_Sans',sans-serif] text-[22px] font-bold text-[#0F172A] leading-tight">
                 মিডিয়া তালিকা
               </h1>
-              <p className="text-[13px] text-[#64748B] mt-0.5">
-                {maxReferrer !== null && (
-                  <span
-                    className="ml-1.5 font-['IBM_Plex_Mono',monospace]"
-                    style={{ color: atReferrerLimit ? "#EF4444" : "#64748B" }}
-                  >
-                    ({stats.total}/{maxReferrer} ব্যবহৃত)
-                  </span>
-                )}
-              </p>
             </div>
           </div>
           <div className="flex items-center gap-2">
