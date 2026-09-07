@@ -100,16 +100,16 @@ const getPricingFlags = ({ amount, doctor }) => {
 // let it wrap — never crop. Same thresholds reused for the PDF (point sizes).
 const getLabNameHtmlSizeClass = (name) => {
   const len = name?.length || 0;
-  if (len > 40) return "text-xs";
-  if (len > 26) return "text-sm";
-  return "text-base";
+  if (len > 40) return "text-sm";
+  if (len > 26) return "text-base";
+  return "text-lg";
 };
 
 const getLabNamePdfFontSize = (name) => {
   const len = name?.length || 0;
-  if (len > 40) return 7.5;
-  if (len > 26) return 8.5;
-  return 10;
+  if (len > 40) return 8.5;
+  if (len > 26) return 10;
+  return 11.5;
 };
 
 // ── Axios‑native network error detection (same as all other pages) ──────────
