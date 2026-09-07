@@ -116,62 +116,67 @@ const getLabNamePdfFontSize = (name) => {
 const isNetworkError = (err) => err?.isAxiosError === true && !err.response;
 
 // ─── PDF styles ───────────────────────────────────────────────────────────────
+// Page carries the symmetric outer margin (A5 print-safe); every section below
+// is inset from that shared padding instead of its own horizontal padding, so
+// left/right margins stay identical all the way down the page.
+
+const PAGE_MARGIN = 18;
 
 const pdf$ = StyleSheet.create({
-  page: { backgroundColor: "#ffffff", fontFamily: "Helvetica", fontSize: 9, color: "#111827" },
-  // header — white bg, black text
-  header: {
+  page: {
     backgroundColor: "#ffffff",
-    borderBottom: "1.5 solid #e5e7eb",
-    padding: "16 20",
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
+    fontFamily: "Helvetica",
+    fontSize: 9,
+    color: "#111827",
+    paddingTop: PAGE_MARGIN,
+    paddingBottom: PAGE_MARGIN,
+    paddingLeft: PAGE_MARGIN,
+    paddingRight: PAGE_MARGIN,
   },
-  headerLeft: { flex: 1, marginRight: 10 },
-  logoRow: { flexDirection: "row", alignItems: "flex-start", marginBottom: 6 },
+  // header — centered, white bg, black text. Invoice ID / date / time no
+  // longer live up here — ID moved beneath the QR code, date/time moved
+  // into the patient grid — so this is now just the lab identity block.
+  header: {
+    alignItems: "center",
+    borderBottom: "1.5 solid #e5e7eb",
+    paddingBottom: 10,
+  },
+  // Stacked (not side-by-side) so the logo, lab name, and "Powered by"
+  // line all sit dead-center on the page instead of being pulled left by
+  // a beside-the-logo layout.
+  logoRow: { flexDirection: "column", alignItems: "center", marginBottom: 4 },
   logoBox: {
-    width: 26,
-    height: 26,
+    width: 24,
+    height: 24,
     backgroundColor: "#2563eb",
     borderRadius: 6,
     alignItems: "center",
     justifyContent: "center",
-    marginRight: 8,
+    marginBottom: 5,
   },
-  logoText: { color: "#ffffff", fontFamily: "Helvetica-Bold", fontSize: 10 },
-  // fontSize is overridden per-invoice via getLabNamePdfFontSize; no maxWidth
-  // so react-pdf wraps naturally within the flex:1 headerLeft column instead
-  // of ever overlapping the invoice-ID badge on the right.
-  labName: { color: "#111827", fontFamily: "Helvetica-Bold" },
-  poweredBy: { color: "#6b7280", fontSize: 6.5, marginTop: 1 },
-  labSub: { color: "#6b7280", fontSize: 8 },
-  headerMeta: { color: "#374151", fontSize: 7.5, marginTop: 2 },
-  headerRight: { alignItems: "flex-end" },
-  invoiceBadge: {
-    backgroundColor: "#f3f4f6",
-    borderRadius: 6,
-    padding: "4 10",
-    alignItems: "center",
-    marginBottom: 6,
-  },
-  invoiceLabel: { color: "#6b7280", fontSize: 7, textTransform: "uppercase", letterSpacing: 0.5 },
-  invoiceId: { color: "#111827", fontFamily: "Helvetica-Bold", fontSize: 12 },
-  dateText: { color: "#374151", fontSize: 7.5 },
-  // sections
-  section: { padding: "12 20", borderBottom: "1 solid #e5e7eb" },
-  sectionLast: { padding: "12 20" },
-  // patient grid
+  logoText: { color: "#ffffff", fontFamily: "Helvetica-Bold", fontSize: 9.5 },
+  // fontSize overridden per-invoice via getLabNamePdfFontSize; centered and
+  // capped in width so long names wrap symmetrically instead of skewing left.
+  labName: { color: "#111827", fontFamily: "Helvetica-Bold", textAlign: "center", maxWidth: 300 },
+  poweredBy: { color: "#6b7280", fontSize: 6.5, marginTop: 1, textAlign: "center" },
+  labAddress: { color: "#374151", fontSize: 8, marginTop: 4, textAlign: "center" },
+  labContact: { color: "#374151", fontSize: 7.5, marginTop: 2, textAlign: "center" },
+  // sections — horizontal inset now comes solely from the page padding
+  section: { paddingTop: 12, paddingBottom: 12, borderBottom: "1 solid #e5e7eb" },
+  sectionLast: { paddingTop: 12 },
+  // patient grid — three columns: Full Name / Gender / Date, then
+  // Age / Contact / Time, with Doctor's Name (when present) spanning all three.
   patientRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" },
   patientGrid: { flex: 1, flexDirection: "row", flexWrap: "wrap" },
-  patientField: { width: "50%", marginBottom: 6 },
+  patientField: { width: "33.33%", marginBottom: 6, paddingRight: 6 },
   patientFieldFull: { width: "100%", marginBottom: 6 },
   fieldLabel: { fontSize: 7, color: "#6b7280", textTransform: "uppercase", letterSpacing: 0.4, marginBottom: 1.5 },
   fieldValue: { fontFamily: "Helvetica-Bold", fontSize: 8.5, color: "#111827" },
-  // QR
+  // QR — Invoice ID now displayed here, directly under the QR code.
   qrContainer: { alignItems: "center", marginLeft: 16 },
   qrImage: { width: 60, height: 60 },
   qrLabel: { fontSize: 6.5, color: "#6b7280", textAlign: "center", marginTop: 3 },
+  qrInvoiceId: { fontSize: 7.5, fontFamily: "Helvetica-Bold", color: "#111827", textAlign: "center", marginTop: 3 },
   dlBtnWrapper: { marginTop: 6, position: "relative" },
   dlBtn: {
     backgroundColor: "#2563eb",
@@ -228,7 +233,7 @@ const pdf$ = StyleSheet.create({
 
 // ─── PDF Document ─────────────────────────────────────────────────────────────
 
-const InvoicePDF = ({ invoice, qrCodeUrl, date, time, labInfo }) => {
+const InvoicePDF = ({ invoice, qrCodeUrl, date, time, labInfo, hideDownloadButton = false }) => {
   const { patient, amount, tests, products, reportLink, invoiceId } = invoice;
   const flags = getPricingFlags(invoice);
   const hasProducts = products.length > 0;
@@ -236,31 +241,19 @@ const InvoicePDF = ({ invoice, qrCodeUrl, date, time, labInfo }) => {
   return (
     <Document>
       <Page size="A5" style={pdf$.page}>
-        {/* Header */}
+        {/* Header — lab identity only, centered top to bottom */}
         <View style={pdf$.header}>
-          <View style={pdf$.headerLeft}>
-            <View style={pdf$.logoRow}>
-              <View style={pdf$.logoBox}>
-                <Text style={pdf$.logoText}>LP</Text>
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={[pdf$.labName, { fontSize: getLabNamePdfFontSize(labInfo.name) }]}>{labInfo.name}</Text>
-                <Text style={pdf$.poweredBy}>Powered by LabPilot Pro</Text>
-              </View>
+          <View style={pdf$.logoRow}>
+            <View style={pdf$.logoBox}>
+              <Text style={pdf$.logoText}>LP</Text>
             </View>
-            <Text style={pdf$.headerMeta}>{labInfo.address}</Text>
-            <Text style={pdf$.headerMeta}>
-              {labInfo.phone} • {labInfo.email}
-            </Text>
+            <Text style={[pdf$.labName, { fontSize: getLabNamePdfFontSize(labInfo.name) }]}>{labInfo.name}</Text>
+            <Text style={pdf$.poweredBy}>Powered by LabPilot Pro</Text>
           </View>
-          <View style={pdf$.headerRight}>
-            <View style={pdf$.invoiceBadge}>
-              <Text style={pdf$.invoiceLabel}>Invoice ID</Text>
-              <Text style={pdf$.invoiceId}>{invoiceId || "N/A"}</Text>
-            </View>
-            <Text style={pdf$.dateText}>Date: {date}</Text>
-            <Text style={pdf$.dateText}>Time: {time}</Text>
-          </View>
+          <Text style={pdf$.labAddress}>{labInfo.address}</Text>
+          <Text style={pdf$.labContact}>
+            {labInfo.phone} • {labInfo.email}
+          </Text>
         </View>
 
         {/* Patient */}
@@ -269,8 +262,10 @@ const InvoicePDF = ({ invoice, qrCodeUrl, date, time, labInfo }) => {
             <View style={pdf$.patientGrid}>
               <PDFField label="Full Name" value={patient.name} style={pdf$.patientField} />
               <PDFField label="Gender" value={patient.gender} style={pdf$.patientField} />
+              <PDFField label="Date" value={date} style={pdf$.patientField} />
               <PDFField label="Age" value={`${patient.age} years`} style={pdf$.patientField} />
               <PDFField label="Contact" value={patient.contactNumber} style={pdf$.patientField} />
+              <PDFField label="Time" value={time} style={pdf$.patientField} />
               {flags.showDoctorName && (
                 <PDFField label="Doctor's Name" value={flags.doctorNameLabel} style={pdf$.patientFieldFull} />
               )}
@@ -279,20 +274,23 @@ const InvoicePDF = ({ invoice, qrCodeUrl, date, time, labInfo }) => {
               <View style={pdf$.qrContainer}>
                 <Image style={pdf$.qrImage} src={qrCodeUrl} />
                 <Text style={pdf$.qrLabel}>Scan to download Reports</Text>
-                <View style={pdf$.dlBtnWrapper}>
-                  <View style={pdf$.dlBtn}>
-                    <View style={pdf$.dlBtnInner}>
-                      <Svg style={pdf$.dlBtnIcon} viewBox="0 0 24 24">
-                        <Path d="M12 16l-6-6h4V4h4v6h4l-6 6z" fill="#ffffff" />
-                        <Path d="M20 18H4v2h16v-2z" fill="#ffffff" />
-                      </Svg>
-                      <Text style={pdf$.dlBtnText}>Click to Download Reports</Text>
+                <Text style={pdf$.qrInvoiceId}>Invoice ID: {invoiceId || "N/A"}</Text>
+                {!hideDownloadButton && (
+                  <View style={pdf$.dlBtnWrapper}>
+                    <View style={pdf$.dlBtn}>
+                      <View style={pdf$.dlBtnInner}>
+                        <Svg style={pdf$.dlBtnIcon} viewBox="0 0 24 24">
+                          <Path d="M12 16l-6-6h4V4h4v6h4l-6 6z" fill="#ffffff" />
+                          <Path d="M20 18H4v2h16v-2z" fill="#ffffff" />
+                        </Svg>
+                        <Text style={pdf$.dlBtnText}>Click to Download Reports</Text>
+                      </View>
                     </View>
+                    <Link src={reportLink} style={pdf$.dlBtnOverlay}>
+                      <Text> </Text>
+                    </Link>
                   </View>
-                  <Link src={reportLink} style={pdf$.dlBtnOverlay}>
-                    <Text> </Text>
-                  </Link>
-                </View>
+                )}
               </View>
             )}
           </View>
@@ -403,65 +401,52 @@ const InvoiceCard = ({ invoice, qrCodeUrl, date, time, labInfo }) => {
 
   return (
     <div className="bg-white shadow-lg rounded-xl overflow-hidden">
-      {/* Header — white bg, black text */}
-      <div className="bg-white border-b border-gray-200 px-6 py-5">
-        <div className="flex items-start justify-between gap-4">
-          <div className="min-w-0 flex-1">
-            <div className="flex items-start gap-3 mb-2">
-              <div className="w-9 h-9 shrink-0 bg-blue-600 rounded-xl flex items-center justify-center">
-                <span className="text-white font-bold text-sm">LP</span>
-              </div>
-              <div className="min-w-0">
-                <h1
-                  className={`font-bold text-gray-900 leading-tight break-words ${getLabNameHtmlSizeClass(
-                    labInfo.name,
-                  )}`}
-                >
-                  {labInfo.name}
-                </h1>
-                <p className="text-gray-500 text-[10px] leading-tight">Powered by LabPilot Pro</p>
-              </div>
-            </div>
-            <div className="mt-2 space-y-1 text-gray-600 text-xs">
-              <div className="flex items-start gap-1.5">
-                <MapPin className="w-3 h-3 shrink-0 mt-0.5" />
-                <span>{labInfo.address}</span>
-              </div>
-              <div className="flex flex-wrap gap-x-4 gap-y-1">
-                <div className="flex items-center gap-1.5">
-                  <Phone className="w-3 h-3 shrink-0" />
-                  <span>{labInfo.phone}</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <Mail className="w-3 h-3 shrink-0" />
-                  <span>{labInfo.email}</span>
-                </div>
-              </div>
-            </div>
+      {/* Header — lab identity only, centered; Invoice ID / date / time moved
+          below the QR code and into the patient grid respectively. */}
+      <div className="bg-white border-b border-gray-200 px-6 py-5 flex flex-col items-center text-center">
+        <div className="flex flex-col items-center gap-1.5 mb-2">
+          <div className="w-9 h-9 shrink-0 bg-blue-600 rounded-xl flex items-center justify-center">
+            <span className="text-white font-bold text-sm">LP</span>
           </div>
-          <div className="text-right shrink-0">
-            <div className="inline-block bg-gray-100 px-3 py-1.5 rounded-lg">
-              <p className="text-gray-500 text-[10px] uppercase tracking-wide font-medium">Invoice ID</p>
-              <p className="text-gray-900 text-lg font-bold">{invoiceId || "N/A"}</p>
+          <div className="text-center">
+            <h1
+              className={`font-bold text-gray-900 leading-tight break-words ${getLabNameHtmlSizeClass(labInfo.name)}`}
+            >
+              {labInfo.name}
+            </h1>
+            <p className="text-gray-500 text-[10px] leading-tight">Powered by LabPilot Pro</p>
+          </div>
+        </div>
+        <div className="mt-1 space-y-1 text-gray-600 text-xs">
+          <div className="flex items-center justify-center gap-1.5">
+            <MapPin className="w-3 h-3 shrink-0" />
+            <span>{labInfo.address}</span>
+          </div>
+          <div className="flex items-center justify-center gap-x-4 gap-y-1 flex-wrap">
+            <div className="flex items-center gap-1.5">
+              <Phone className="w-3 h-3 shrink-0" />
+              <span>{labInfo.phone}</span>
             </div>
-            <div className="mt-2 text-gray-600 text-xs space-y-0.5">
-              <p>Date: {date}</p>
-              <p>Time: {time}</p>
+            <div className="flex items-center gap-1.5">
+              <Mail className="w-3 h-3 shrink-0" />
+              <span>{labInfo.email}</span>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Patient */}
+      {/* Patient — three columns: Full Name / Gender / Date, then Age / Contact / Time */}
       <div className="px-6 py-4 border-b border-gray-200">
         <div className="flex items-start gap-4">
-          <div className="grid grid-cols-2 gap-x-4 gap-y-3 flex-1">
+          <div className="grid grid-cols-3 gap-x-4 gap-y-3 flex-1">
             <PatientField label="Full Name" value={patient.name} />
             <PatientField label="Gender" value={<span className="capitalize">{patient.gender}</span>} />
+            <PatientField label="Date" value={date} />
             <PatientField label="Age" value={`${patient.age} years`} />
             <PatientField label="Contact" value={patient.contactNumber} />
+            <PatientField label="Time" value={time} />
             {flags.showDoctorName && (
-              <div className="col-span-2">
+              <div className="col-span-3">
                 <PatientField label="Doctor's Name" value={flags.doctorNameLabel} />
               </div>
             )}
@@ -470,6 +455,7 @@ const InvoiceCard = ({ invoice, qrCodeUrl, date, time, labInfo }) => {
             <div className="shrink-0 flex flex-col items-center gap-0.5">
               <img src={qrCodeUrl} alt="QR Code" className="w-20 h-20" />
               <p className="text-[9px] text-gray-500 text-center leading-tight">Scan to download Reports</p>
+              <p className="text-[10px] font-semibold text-gray-900 text-center">Invoice ID: {invoiceId || "N/A"}</p>
               <a
                 href={reportLink}
                 target="_blank"
@@ -662,10 +648,21 @@ const PrintInvoice = () => {
 
   // ── PDF helpers ────────────────────────────────────────────────────────────
 
-  const buildPDF = () => {
+  // `hideDownloadButton` lets callers (print) render the PDF without the
+  // "Click to Download Reports" CTA — it's a link overlay meant for on-screen
+  // clicking, so it has no purpose on a physical printout. Download/Share
+  // keep it since those PDFs stay digital.
+  const buildPDF = ({ hideDownloadButton = false } = {}) => {
     const { date, time } = formatDateTime(invoice.createdAt);
     return pdf(
-      <InvoicePDF invoice={invoice} qrCodeUrl={qrCodeUrl} date={date} time={time} labInfo={labInfo} />,
+      <InvoicePDF
+        invoice={invoice}
+        qrCodeUrl={qrCodeUrl}
+        date={date}
+        time={time}
+        labInfo={labInfo}
+        hideDownloadButton={hideDownloadButton}
+      />,
     ).toBlob();
   };
 
@@ -695,7 +692,10 @@ const PrintInvoice = () => {
   const handlePrint = async () => {
     try {
       setPrinting(true);
-      const url = URL.createObjectURL(await buildPDF());
+      // hideDownloadButton: true — the "Click to Download Reports" CTA is a
+      // clickable link meant for an on-screen PDF; it has no purpose (and
+      // shouldn't render) on a physical printout.
+      const url = URL.createObjectURL(await buildPDF({ hideDownloadButton: true }));
       const iframe = Object.assign(document.createElement("iframe"), {
         src: url,
         style: "position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;border:0;",
