@@ -190,6 +190,11 @@ function NumberField({ field, value, onChange, error, patientAge, patientGender,
         type="number"
         value={value}
         onChange={(e) => onChange(e.target.value)}
+        // Blur on wheel so scrolling (mouse wheel / two-finger trackpad)
+        // scrolls the page instead of being captured by the number input's
+        // native up/down-step-on-scroll behavior, which was silently
+        // changing the entered value while the user tried to scroll past it.
+        onWheel={(e) => e.currentTarget.blur()}
         className="flex-1 min-w-0 px-3 py-2.5 bg-white text-sm font-mono text-slate-900 focus:outline-none"
       />
       {field.unit && (
