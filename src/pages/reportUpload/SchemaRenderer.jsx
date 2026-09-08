@@ -566,9 +566,9 @@ function Alert({ tone, icon: Icon, title, children }) {
   return (
     <div className={`flex items-start gap-3 px-4 py-3 rounded-lg border-l-4 ${s.wrap}`}>
       <Icon className={`w-4 h-4 shrink-0 mt-0.5 ${s.icon}`} />
-      <div>
+      <div className="flex-1 min-w-0">
         <div className={`text-xs font-bold uppercase tracking-wide mb-0.5 ${s.title}`}>{title}</div>
-        <div className={`text-[13px] leading-relaxed ${s.body}`}>{children}</div>
+        <div className={`text-[13px] leading-relaxed break-words ${s.body}`}>{children}</div>
       </div>
     </div>
   );
@@ -830,11 +830,22 @@ function SchemaRenderer({
           ))}
         </div>
 
-        {/* Static range note */}
+        {/* Static range note — rendered with whitespace-pre-wrap so
+            newlines/spacing in the DB value (e.g. a multi-line reference
+            table) render exactly as stored, instead of being collapsed
+            into a single line by default HTML whitespace handling. */}
         {schema.hasStaticStandardRange && schema.staticStandardRange && (
-          <Alert tone="amber" icon={Info} title="Standard Reference">
-            {schema.staticStandardRange}
-          </Alert>
+          <div className="bg-white rounded-xl border border-amber-200 overflow-hidden">
+            <div className="flex items-center gap-2 px-4 py-2.5 bg-amber-50 border-b border-amber-200">
+              <Info className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+              <h3 className="text-xs font-bold uppercase tracking-wide text-amber-800">Standard Reference</h3>
+            </div>
+            <div className="bg-amber-50/40 p-4">
+              <p className="text-xs font-semibold text-black whitespace-pre-wrap leading-relaxed">
+                {schema.staticStandardRange}
+              </p>
+            </div>
+          </div>
         )}
 
         {/* Validation errors */}
