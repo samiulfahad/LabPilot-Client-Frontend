@@ -1,16 +1,32 @@
 import { useState } from "react";
-import { PhoneCall, MessageSquareText, Send, HelpCircle, Phone } from "lucide-react";
+import { PhoneCall, MessageSquareText, MessageCircle, Send, HelpCircle, Phone } from "lucide-react";
 import helpCenterService from "../../api/helpCenter";
 import Popup from "../../components/popup";
+import { useAuthStore } from "../../store/authStore"; // adjust path to your actual store
 
 const PHONE_NUMBER = "+880 1518-918551";
 const PHONE_TEL = "+8801518918551";
 
+// wa.me requires the number with country code and no leading "+", spaces, or dashes.
+const WHATSAPP_NUMBER = "8801518918551";
+
 const CONTACT_PATTERN = /^\d{11}$/;
 
+// Below Tailwind's `md` breakpoint (768px) counts as mobile here — matches
+// the rest of the app's responsive classes, so it stays consistent with
+// wherever else "mobile" is decided by screen width rather than user agent.
+const isMobileViewport = () => typeof window !== "undefined" && window.innerWidth < 768;
+
 export default function HelpCenter() {
-  const [activeTab, setActiveTab] = useState("message"); // "call" | "message"
+  const user = useAuthStore((s) => s.user);
+  const lab = useAuthStore((s) => s.lab);
+
+  // Defaults to the WhatsApp tab on mobile (staff are far more likely to
+  // already have WhatsApp open there), and Message on desktop. Only read
+  // once on mount — doesn't re-jump the user's tab on window resize.
+  const [activeTab, setActiveTab] = useState(() => (isMobileViewport() ? "whatsapp" : "message")); // "call" | "message" | "whatsapp"
   const [message, setMessage] = useState("");
+  const [whatsappMessage, setWhatsappMessage] = useState("");
   const [contact, setContact] = useState("");
   const [contactTouched, setContactTouched] = useState(false);
   const [status, setStatus] = useState("idle"); // idle | sending | error
@@ -43,9 +59,30 @@ export default function HelpCenter() {
     }
   };
 
+  // WhatsApp tab has its own textarea (whatsappMessage) — separate from the
+  // in-app message box — so switching tabs doesn't clobber either draft.
+  // labKey/hospital/user context is prepended automatically so support can
+  // identify the lab without back-and-forth. No contact-number requirement
+  // here (WhatsApp already carries the person's identity).
+  //
+  // labKey comes from the decoded JWT on `user` (see authStore.js) — `lab`
+  // itself only carries the hospital/lab name here, not an identifier.
+  const handleWhatsApp = () => {
+    const context = [
+      `ল্যাব কী: ${user?.labKey || "—"}`,
+      `হাসপাতাল/ল্যাবের নাম: ${lab?.name || "—"}`,
+      `ব্যবহারকারী: ${user?.name || "—"}`,
+    ].join("\n");
+
+    const body = whatsappMessage.trim() ? `${context}\n\n${whatsappMessage.trim()}` : `${context}\n\nসমস্যা: `;
+
+    window.open(`https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(body)}`, "_blank", "noopener,noreferrer");
+  };
+
   const tabs = [
     { id: "call", label: "ফোনে কল করুন", icon: PhoneCall },
     { id: "message", label: "মেসেজ পাঠান", icon: MessageSquareText },
+    { id: "whatsapp", label: "হোয়াটসঅ্যাপ", icon: MessageCircle },
   ];
 
   return (
@@ -116,7 +153,7 @@ export default function HelpCenter() {
           className="bg-white border border-gray-100 rounded-3xl p-6 overflow-hidden"
           style={{ animation: "cardIn 0.5s cubic-bezier(.22,1,.36,1) 0.15s both" }}
         >
-          {activeTab === "call" ? (
+          {activeTab === "call" && (
             <div className="flex flex-col items-center text-center py-4">
               <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-indigo-200/60 mb-5">
                 <PhoneCall className="w-7 h-7 text-white" strokeWidth={2} />
@@ -131,7 +168,9 @@ export default function HelpCenter() {
                 <PhoneCall className="w-4 h-4" /> কল করুন
               </a>
             </div>
-          ) : (
+          )}
+
+          {activeTab === "message" && (
             <div>
               <p className="text-sm font-bold text-gray-900 mb-1">আমাদের মেসেজ পাঠান</p>
               <p className="text-[11.5px] text-gray-400 mb-4">অভিযোগ, প্রশ্ন, যেকোনো কিছু — আমরা যোগাযোগ করব।</p>
@@ -183,6 +222,36 @@ export default function HelpCenter() {
               {status === "error" && (
                 <p className="text-[11px] text-red-500 mt-2">কিছু একটা সমস্যা হয়েছে। আবার চেষ্টা করুন।</p>
               )}
+            </div>
+          )}
+
+          {activeTab === "whatsapp" && (
+            <div>
+              <p className="text-sm font-bold text-gray-900 mb-1">হোয়াটসঅ্যাপে মেসেজ করুন</p>
+              <p className="text-[11.5px] text-gray-400 mb-4">
+                আপনার ল্যাব ও নাম স্বয়ংক্রিয়ভাবে যুক্ত হয়ে যাবে — নিচে সমস্যাটি লিখুন।
+              </p>
+
+              <label className="block text-[11.5px] font-bold text-gray-600 mb-1.5">মেসেজ</label>
+              <textarea
+                value={whatsappMessage}
+                onChange={(e) => setWhatsappMessage(e.target.value)}
+                placeholder="এখানে আপনার সমস্যা লিখুন..."
+                rows={5}
+                maxLength={2000}
+                className="w-full rounded-2xl border border-gray-200 p-4 text-sm text-gray-800 placeholder:text-gray-300 focus:outline-none focus:ring-2 focus:ring-green-200 resize-none"
+              />
+
+              <div className="flex items-center justify-between mt-3">
+                <p className="text-[10px] text-gray-300">{whatsappMessage.length}/2000</p>
+                <button
+                  type="button"
+                  onClick={handleWhatsApp}
+                  className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-br from-emerald-500 to-green-600 text-white text-sm font-bold shadow-md shadow-green-200 hover:shadow-lg transition-all duration-200"
+                >
+                  <MessageCircle className="w-4 h-4" /> হোয়াটসঅ্যাপ খুলুন
+                </button>
+              </div>
             </div>
           )}
         </div>
