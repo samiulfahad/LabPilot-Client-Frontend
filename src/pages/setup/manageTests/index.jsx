@@ -71,6 +71,19 @@ const getErrorStatus = (error) => error?.response?.status ?? error?.status ?? nu
 // ── Axios‑native network error detection (same as all other pages) ──────────
 const isNetworkError = (err) => err?.isAxiosError === true && !err.response;
 
+// ── Search normalisation ─────────────────────────────────────────────────────
+// Test names carry inconsistent punctuation/spacing across the catalog
+// (e.g. "S. GPT", "S GPT", "S-GPT", "HIV (1+2)"). Strip everything except
+// letters/digits (and lowercase) from both the query and the candidate name
+// before comparing, so "sgpt" matches all of the above regardless of dots,
+// dashes, spaces, parentheses, plus signs, etc.
+const normaliseForSearch = (str) => (str ?? "").toLowerCase().replace(/[^a-z0-9\u0980-\u09FF]/g, "");
+const matchesSearch = (name, query) => {
+  const q = normaliseForSearch(query);
+  if (!q) return true;
+  return normaliseForSearch(name).includes(q);
+};
+
 // ── Shared input helpers ───────────────────────────────────────────────────────
 const inputBase =
   "w-full outline-none transition-all rounded-xl border-[1.5px] border-[#E2E8F0] bg-white text-[#0F172A] font-['IBM_Plex_Mono',monospace]";
@@ -527,8 +540,7 @@ const AddTestModal = ({ existingTests, onClose, onSaved, onNetworkError }) => {
   const categoryMap = Object.fromEntries(categories.filter((c) => c._id).map((c) => [c._id, c.name]));
 
   const filtered = useMemo(() => {
-    const q = searchQuery.toLowerCase();
-    return availableTests.filter((t) => !q || t.name.toLowerCase().includes(q));
+    return availableTests.filter((t) => matchesSearch(t.name, searchQuery));
   }, [availableTests, searchQuery]);
 
   const groupedTests = useMemo(() => {
@@ -1135,10 +1147,9 @@ const ManageTests = () => {
   );
 
   const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
     return enrichedTests
       .filter((t) => (statusFilter === "online" ? t.isOnline : statusFilter === "offline" ? !t.isOnline : true))
-      .filter((t) => !q || t.name.toLowerCase().includes(q));
+      .filter((t) => matchesSearch(t.name, search));
   }, [enrichedTests, statusFilter, search]);
 
   const groups = useMemo(() => {

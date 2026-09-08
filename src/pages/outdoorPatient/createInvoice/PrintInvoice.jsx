@@ -25,18 +25,9 @@ const fmt = (n) =>
 
 const formatDateTime = (ts) => {
   const d = new Date(ts);
-  const day = d.getDate();
-  const suffix =
-    day % 10 === 1 && day % 100 !== 11
-      ? "st"
-      : day % 10 === 2 && day % 100 !== 12
-        ? "nd"
-        : day % 10 === 3 && day % 100 !== 13
-          ? "rd"
-          : "th";
   const h = d.getHours();
   return {
-    date: `${day}${suffix} ${d.toLocaleString("default", { month: "long" })}, ${d.getFullYear()}`,
+    date: `${String(d.getDate()).padStart(2, "0")} ${d.toLocaleString("default", { month: "short" })} ${d.getFullYear()}`,
     time: `${h % 12 === 0 ? 12 : h % 12}:${String(d.getMinutes()).padStart(2, "0")}${h >= 12 ? "PM" : "AM"}`,
   };
 };
@@ -83,11 +74,17 @@ const getDoctorNameLabel = ({ doctor }) => {
 const getPricingFlags = ({ amount, doctor }) => {
   const due = Math.max(0, amount.final - amount.paid);
   const doctorNameLabel = getDoctorNameLabel({ doctor });
+  // Subtotal = sum of line items (amount.initial) + the online invoice fee,
+  // so it reflects everything charged before discounts/adjustments come off.
+  const subtotalValue = amount.initial + amount.invoiceFee;
   return {
     showReferrerDiscount: amount.referrerDiscount > 0,
     showInvoiceFee: amount.invoiceFee > 0,
     showLabAdjustment: amount.labAdjustment > 0,
-    showSubtotal: amount.referrerDiscount > 0 || amount.labAdjustment > 0,
+    // Show the Subtotal row whenever it would differ from the raw item sum
+    // (a fee was added) or there's a deduction below it to subtotal from.
+    showSubtotal: amount.referrerDiscount > 0 || amount.labAdjustment > 0 || amount.invoiceFee > 0,
+    subtotalValue,
     showDoctorName: Boolean(doctorNameLabel),
     doctorNameLabel,
     due,
@@ -97,19 +94,21 @@ const getPricingFlags = ({ amount, doctor }) => {
 
 // Lab name can be arbitrarily long (multi-branch names, English+Bangla mixes).
 // Instead of truncating with an ellipsis, shrink the font a step at a time and
-// let it wrap — never crop. Same thresholds reused for the PDF (point sizes).
+// let it wrap — never crop. Sizes bumped up a step across the board (and the
+// wrap width widened) so long names read bigger before they have to shrink.
+// Same thresholds reused for the PDF (point sizes).
 const getLabNameHtmlSizeClass = (name) => {
   const len = name?.length || 0;
-  if (len > 40) return "text-sm";
-  if (len > 26) return "text-base";
-  return "text-lg";
+  if (len > 40) return "text-lg";
+  if (len > 26) return "text-xl";
+  return "text-2xl";
 };
 
 const getLabNamePdfFontSize = (name) => {
   const len = name?.length || 0;
-  if (len > 40) return 8.5;
-  if (len > 26) return 10;
-  return 11.5;
+  if (len > 40) return 12;
+  if (len > 26) return 14;
+  return 16;
 };
 
 // ── Axios‑native network error detection (same as all other pages) ──────────
@@ -127,7 +126,7 @@ const pdf$ = StyleSheet.create({
     backgroundColor: "#ffffff",
     fontFamily: "Helvetica",
     fontSize: 9,
-    color: "#111827",
+    color: "#000000",
     paddingTop: PAGE_MARGIN,
     paddingBottom: PAGE_MARGIN,
     paddingLeft: PAGE_MARGIN,
@@ -141,26 +140,27 @@ const pdf$ = StyleSheet.create({
     borderBottom: "1.5 solid #e5e7eb",
     paddingBottom: 10,
   },
-  // Stacked (not side-by-side) so the logo, lab name, and "Powered by"
-  // line all sit dead-center on the page instead of being pulled left by
-  // a beside-the-logo layout.
-  logoRow: { flexDirection: "column", alignItems: "center", marginBottom: 4 },
+  // Logo sits to the left of the lab name/tagline block, both vertically
+  // centered together, with the whole row centered on the page.
+  logoRow: { flexDirection: "row", alignItems: "center", justifyContent: "center", marginBottom: 4 },
   logoBox: {
-    width: 24,
-    height: 24,
+    width: 26,
+    height: 26,
     backgroundColor: "#2563eb",
     borderRadius: 6,
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: 5,
+    marginRight: 8,
   },
-  logoText: { color: "#ffffff", fontFamily: "Helvetica-Bold", fontSize: 9.5 },
-  // fontSize overridden per-invoice via getLabNamePdfFontSize; centered and
-  // capped in width so long names wrap symmetrically instead of skewing left.
-  labName: { color: "#111827", fontFamily: "Helvetica-Bold", textAlign: "center", maxWidth: 300 },
-  poweredBy: { color: "#6b7280", fontSize: 6.5, marginTop: 1, textAlign: "center" },
-  labAddress: { color: "#374151", fontSize: 8, marginTop: 4, textAlign: "center" },
-  labContact: { color: "#374151", fontSize: 7.5, marginTop: 2, textAlign: "center" },
+  logoText: { color: "#ffffff", fontFamily: "Helvetica-Bold", fontSize: 10 },
+  logoTextBlock: { alignItems: "flex-start" },
+  // fontSize overridden per-invoice via getLabNamePdfFontSize; left-aligned
+  // next to the logo. Wrap width widened (280 -> 340) so bigger text still
+  // has room to wrap onto a second line instead of forcing a smaller size.
+  labName: { color: "#000000", fontFamily: "Helvetica-Bold", textAlign: "left", maxWidth: 340, lineHeight: 1.15 },
+  poweredBy: { color: "#6b7280", fontSize: 6.5, marginTop: 1, textAlign: "left" },
+  labAddress: { color: "#000000", fontSize: 8, marginTop: 4, textAlign: "center" },
+  labContact: { color: "#000000", fontSize: 7.5, marginTop: 2, textAlign: "center" },
   // sections — horizontal inset now comes solely from the page padding
   section: { paddingTop: 12, paddingBottom: 12, borderBottom: "1 solid #e5e7eb" },
   sectionLast: { paddingTop: 12 },
@@ -170,13 +170,14 @@ const pdf$ = StyleSheet.create({
   patientGrid: { flex: 1, flexDirection: "row", flexWrap: "wrap" },
   patientField: { width: "33.33%", marginBottom: 6, paddingRight: 6 },
   patientFieldFull: { width: "100%", marginBottom: 6 },
-  fieldLabel: { fontSize: 7, color: "#6b7280", textTransform: "uppercase", letterSpacing: 0.4, marginBottom: 1.5 },
-  fieldValue: { fontFamily: "Helvetica-Bold", fontSize: 8.5, color: "#111827" },
+  fieldInline: { fontSize: 8.5, color: "#000000" },
+  fieldLabelLine: { fontFamily: "Helvetica", fontSize: 8.5, color: "#000000" },
+  fieldValueLine: { fontFamily: "Helvetica-Bold", fontSize: 8.5, color: "#000000" },
   // QR — Invoice ID now displayed here, directly under the QR code.
   qrContainer: { alignItems: "center", marginLeft: 16 },
   qrImage: { width: 60, height: 60 },
-  qrLabel: { fontSize: 6.5, color: "#6b7280", textAlign: "center", marginTop: 3 },
-  qrInvoiceId: { fontSize: 7.5, fontFamily: "Helvetica-Bold", color: "#111827", textAlign: "center", marginTop: 3 },
+  qrLabel: { fontSize: 6.5, color: "#000000", textAlign: "center", marginTop: 3 },
+  qrInvoiceId: { fontSize: 7.5, fontFamily: "Helvetica-Bold", color: "#000000", textAlign: "center", marginTop: 3 },
   dlBtnWrapper: { marginTop: 6, position: "relative" },
   dlBtn: {
     backgroundColor: "#2563eb",
@@ -194,13 +195,13 @@ const pdf$ = StyleSheet.create({
   tableHeader: { flexDirection: "row", backgroundColor: "#f3f4f6", padding: "5 8", borderBottom: "1 solid #e5e7eb" },
   tableRow: { flexDirection: "row", padding: "5 8", borderBottom: "1 solid #f3f4f6" },
   tableRowEven: { flexDirection: "row", padding: "5 8", borderBottom: "1 solid #f3f4f6", backgroundColor: "#fafafa" },
-  colNum: { width: "8%", fontSize: 8, color: "#6b7280" },
-  colName: { flex: 1, fontSize: 8 },
-  colPrice: { width: "25%", fontSize: 8, textAlign: "right", fontFamily: "Helvetica-Bold" },
+  colNum: { width: "8%", fontSize: 8, color: "#000000" },
+  colName: { flex: 1, fontSize: 8, color: "#000000" },
+  colPrice: { width: "25%", fontSize: 8, textAlign: "right", fontFamily: "Helvetica-Bold", color: "#000000" },
   colHeader: {
     fontFamily: "Helvetica-Bold",
     fontSize: 7.5,
-    color: "#374151",
+    color: "#000000",
     textTransform: "uppercase",
     letterSpacing: 0.4,
   },
@@ -208,17 +209,17 @@ const pdf$ = StyleSheet.create({
   pricingBox: { marginTop: 10, alignItems: "flex-end" },
   pricingInner: { width: 220 },
   pricingRow: { flexDirection: "row", justifyContent: "space-between", marginBottom: 4 },
-  pricingLabel: { fontSize: 8, color: "#6b7280" },
-  pricingValue: { fontSize: 8, fontFamily: "Helvetica-Bold", color: "#111827" },
-  pricingNeg: { fontSize: 8, color: "#dc2626" },
-  pricingFee: { fontSize: 8, fontFamily: "Helvetica-Bold", color: "#2563eb" },
-  pricingPaid: { fontSize: 8, fontFamily: "Helvetica-Bold", color: "#16a34a" },
-  pricingDue: { fontSize: 8, fontFamily: "Helvetica-Bold", color: "#dc2626" },
+  pricingLabel: { fontSize: 8, color: "#000000" },
+  pricingValue: { fontSize: 8, fontFamily: "Helvetica-Bold", color: "#000000" },
+  pricingNeg: { fontSize: 8, fontFamily: "Helvetica-Bold", color: "#000000" },
+  pricingFee: { fontSize: 8, fontFamily: "Helvetica-Bold", color: "#000000" },
+  pricingPaid: { fontSize: 8, fontFamily: "Helvetica-Bold", color: "#000000" },
+  pricingDue: { fontSize: 8, fontFamily: "Helvetica-Bold", color: "#000000" },
   divider: { borderTop: "1.5 solid #d1d5db", marginVertical: 5 },
   dashedDivider: { borderTop: "1 dashed #d1d5db", marginVertical: 5 },
   totalRow: { flexDirection: "row", justifyContent: "space-between", marginTop: 2 },
-  totalLabel: { fontSize: 10, fontFamily: "Helvetica-Bold", color: "#111827" },
-  totalValue: { fontSize: 12, fontFamily: "Helvetica-Bold", color: "#2563eb" },
+  totalLabel: { fontSize: 10, fontFamily: "Helvetica-Bold", color: "#000000" },
+  totalValue: { fontSize: 12, fontFamily: "Helvetica-Bold", color: "#000000" },
   paidBadge: {
     flexDirection: "row",
     alignItems: "center",
@@ -228,7 +229,7 @@ const pdf$ = StyleSheet.create({
     backgroundColor: "#dcfce7",
     borderRadius: 4,
   },
-  paidBadgeText: { fontSize: 8, fontFamily: "Helvetica-Bold", color: "#16a34a" },
+  paidBadgeText: { fontSize: 8, fontFamily: "Helvetica-Bold", color: "#000000" },
 });
 
 // ─── PDF Document ─────────────────────────────────────────────────────────────
@@ -241,14 +242,16 @@ const InvoicePDF = ({ invoice, qrCodeUrl, date, time, labInfo, hideDownloadButto
   return (
     <Document>
       <Page size="A5" style={pdf$.page}>
-        {/* Header — lab identity only, centered top to bottom */}
+        {/* Header — logo to the left of the lab name/tagline block */}
         <View style={pdf$.header}>
           <View style={pdf$.logoRow}>
             <View style={pdf$.logoBox}>
               <Text style={pdf$.logoText}>LP</Text>
             </View>
-            <Text style={[pdf$.labName, { fontSize: getLabNamePdfFontSize(labInfo.name) }]}>{labInfo.name}</Text>
-            <Text style={pdf$.poweredBy}>Powered by LabPilot Pro</Text>
+            <View style={pdf$.logoTextBlock}>
+              <Text style={[pdf$.labName, { fontSize: getLabNamePdfFontSize(labInfo.name) }]}>{labInfo.name}</Text>
+              <Text style={pdf$.poweredBy}>Powered by LabPilot Pro</Text>
+            </View>
           </View>
           <Text style={pdf$.labAddress}>{labInfo.address}</Text>
           <Text style={pdf$.labContact}>
@@ -260,10 +263,10 @@ const InvoicePDF = ({ invoice, qrCodeUrl, date, time, labInfo, hideDownloadButto
         <View style={pdf$.section}>
           <View style={pdf$.patientRow}>
             <View style={pdf$.patientGrid}>
-              <PDFField label="Full Name" value={patient.name} style={pdf$.patientField} />
+              <PDFField label="Full Name" value={patient.name} style={pdf$.patientFieldFull} />
               <PDFField label="Gender" value={patient.gender} style={pdf$.patientField} />
-              <PDFField label="Date" value={date} style={pdf$.patientField} />
               <PDFField label="Age" value={`${patient.age} years`} style={pdf$.patientField} />
+              <PDFField label="Date" value={date} style={pdf$.patientField} />
               <PDFField label="Contact" value={patient.contactNumber} style={pdf$.patientField} />
               <PDFField label="Time" value={time} style={pdf$.patientField} />
               {flags.showDoctorName && (
@@ -327,15 +330,23 @@ const InvoicePDF = ({ invoice, qrCodeUrl, date, time, labInfo, hideDownloadButto
             </View>
           ))}
 
-          {/* Pricing summary */}
+          {/* Pricing summary — Online Invoice Fee, then Subtotal, then any
+              deductions (Media Discount / Lab Adjustment), then Total. */}
           <View style={pdf$.pricingBox}>
             <View style={pdf$.pricingInner}>
+              {flags.showInvoiceFee && (
+                <PDFPricingRow
+                  label="Online Report Fee"
+                  value={`+ ${fmt(amount.invoiceFee)}`}
+                  valueStyle={pdf$.pricingFee}
+                />
+              )}
               {flags.showSubtotal && (
-                <PDFPricingRow label="Subtotal" value={fmt(amount.initial)} valueStyle={pdf$.pricingValue} />
+                <PDFPricingRow label="Subtotal" value={fmt(flags.subtotalValue)} valueStyle={pdf$.pricingValue} />
               )}
               {flags.showReferrerDiscount && (
                 <PDFPricingRow
-                  label="Referrer Discount"
+                  label="Media Discount"
                   value={`- ${fmt(amount.referrerDiscount)}`}
                   valueStyle={pdf$.pricingNeg}
                 />
@@ -348,13 +359,6 @@ const InvoicePDF = ({ invoice, qrCodeUrl, date, time, labInfo, hideDownloadButto
                 />
               )}
               <View style={pdf$.divider} />
-              {flags.showInvoiceFee && (
-                <PDFPricingRow
-                  label="Online Report Fee"
-                  value={`+ ${fmt(amount.invoiceFee)}`}
-                  valueStyle={pdf$.pricingFee}
-                />
-              )}
               <View style={pdf$.totalRow}>
                 <Text style={pdf$.totalLabel}>Total Amount</Text>
                 <Text style={pdf$.totalValue}>{fmt(amount.final)}</Text>
@@ -380,8 +384,10 @@ const InvoicePDF = ({ invoice, qrCodeUrl, date, time, labInfo, hideDownloadButto
 // Small stateless helpers used only inside the PDF
 const PDFField = ({ label, value, style }) => (
   <View style={style}>
-    <Text style={pdf$.fieldLabel}>{label}</Text>
-    <Text style={pdf$.fieldValue}>{value}</Text>
+    <Text style={pdf$.fieldInline}>
+      <Text style={pdf$.fieldLabelLine}>{label}: </Text>
+      <Text style={pdf$.fieldValueLine}>{value}</Text>
+    </Text>
   </View>
 );
 
@@ -401,23 +407,21 @@ const InvoiceCard = ({ invoice, qrCodeUrl, date, time, labInfo }) => {
 
   return (
     <div className="bg-white shadow-lg rounded-xl overflow-hidden">
-      {/* Header — lab identity only, centered; Invoice ID / date / time moved
-          below the QR code and into the patient grid respectively. */}
+      {/* Header — logo to the left of the lab name/tagline block */}
       <div className="bg-white border-b border-gray-200 px-6 py-5 flex flex-col items-center text-center">
-        <div className="flex flex-col items-center gap-1.5 mb-2">
-          <div className="w-9 h-9 shrink-0 bg-blue-600 rounded-xl flex items-center justify-center">
+        <div className="flex flex-row items-center justify-center gap-2.5 mb-2">
+          <div className="w-10 h-10 shrink-0 bg-blue-600 rounded-xl flex items-center justify-center">
             <span className="text-white font-bold text-sm">LP</span>
           </div>
-          <div className="text-center">
-            <h1
-              className={`font-bold text-gray-900 leading-tight break-words ${getLabNameHtmlSizeClass(labInfo.name)}`}
-            >
+          {/* max-w widened so the bigger name row has room to wrap before shrinking */}
+          <div className="text-left max-w-md">
+            <h1 className={`font-bold text-black leading-tight break-words ${getLabNameHtmlSizeClass(labInfo.name)}`}>
               {labInfo.name}
             </h1>
             <p className="text-gray-500 text-[10px] leading-tight">Powered by LabPilot Pro</p>
           </div>
         </div>
-        <div className="mt-1 space-y-1 text-gray-600 text-xs">
+        <div className="mt-1 space-y-1 text-black text-xs">
           <div className="flex items-center justify-center gap-1.5">
             <MapPin className="w-3 h-3 shrink-0" />
             <span>{labInfo.address}</span>
@@ -438,7 +442,7 @@ const InvoiceCard = ({ invoice, qrCodeUrl, date, time, labInfo }) => {
       {/* Patient — three columns: Full Name / Gender / Date, then Age / Contact / Time */}
       <div className="px-6 py-4 border-b border-gray-200">
         <div className="flex items-start gap-4">
-          <div className="grid grid-cols-3 gap-x-4 gap-y-3 flex-1">
+          <div className="grid grid-cols-3 gap-x-4 gap-y-2 flex-1">
             <PatientField label="Full Name" value={patient.name} />
             <PatientField label="Gender" value={<span className="capitalize">{patient.gender}</span>} />
             <PatientField label="Date" value={date} />
@@ -454,8 +458,8 @@ const InvoiceCard = ({ invoice, qrCodeUrl, date, time, labInfo }) => {
           {qrCodeUrl && (
             <div className="shrink-0 flex flex-col items-center gap-0.5">
               <img src={qrCodeUrl} alt="QR Code" className="w-20 h-20" />
-              <p className="text-[9px] text-gray-500 text-center leading-tight">Scan to download Reports</p>
-              <p className="text-[10px] font-semibold text-gray-900 text-center">Invoice ID: {invoiceId || "N/A"}</p>
+              <p className="text-[9px] text-black text-center leading-tight">Scan to download Reports</p>
+              <p className="text-[10px] font-semibold text-black text-center">Invoice ID: {invoiceId || "N/A"}</p>
               <a
                 href={reportLink}
                 target="_blank"
@@ -477,11 +481,11 @@ const InvoiceCard = ({ invoice, qrCodeUrl, date, time, labInfo }) => {
           <table className="w-full">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase w-8">#</th>
-                <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase">
+                <th className="px-3 py-2 text-left text-xs font-semibold text-black uppercase w-8">#</th>
+                <th className="px-3 py-2 text-left text-xs font-semibold text-black uppercase">
                   {tests.length > 0 && products.length > 0 ? "Test / Product" : tests.length > 0 ? "Test" : "Product"}
                 </th>
-                <th className="px-3 py-2 text-right text-xs font-semibold text-gray-600 uppercase">Price</th>
+                <th className="px-3 py-2 text-right text-xs font-semibold text-black uppercase">Price</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -497,7 +501,7 @@ const InvoiceCard = ({ invoice, qrCodeUrl, date, time, labInfo }) => {
                       qty > 1 ? (
                         <>
                           {p.name}{" "}
-                          <span className="text-gray-400 font-normal text-xs">
+                          <span className="text-black font-normal text-xs">
                             ({qty} × {fmt(unitPrice)})
                           </span>
                         </>
@@ -509,54 +513,59 @@ const InvoiceCard = ({ invoice, qrCodeUrl, date, time, labInfo }) => {
                 }),
               ].map((row, i) => (
                 <tr key={row.key} className={i % 2 === 1 ? "bg-gray-50/50" : ""}>
-                  <td className="px-3 py-2.5 text-xs text-gray-500">{row.n}</td>
-                  <td className="px-3 py-2.5 text-sm text-gray-900">{row.name}</td>
-                  <td className="px-3 py-2.5 text-sm text-gray-900 text-right font-medium">{row.price}</td>
+                  <td className="px-3 py-2.5 text-xs text-black">{row.n}</td>
+                  <td className="px-3 py-2.5 text-sm text-black">{row.name}</td>
+                  <td className="px-3 py-2.5 text-sm text-black text-right font-medium">{row.price}</td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
 
-        {/* Pricing summary */}
+        {/* Pricing summary — Online Invoice Fee, then Subtotal, then any
+            deductions (Media Discount / Lab Adjustment), then Total. */}
         <div className="mt-3 flex justify-end">
           <div className="w-64 space-y-1.5">
-            {flags.showSubtotal && <PricingRow label="Subtotal" value={fmt(amount.initial)} />}
-            {flags.showReferrerDiscount && (
-              <PricingRow
-                label="Referrer Discount"
-                value={`- ${fmt(amount.referrerDiscount)}`}
-                valueClass="text-red-600"
-              />
-            )}
-            {flags.showLabAdjustment && (
-              <PricingRow label="Lab Adjustment" value={`- ${fmt(amount.labAdjustment)}`} valueClass="text-red-600" />
-            )}
             {flags.showInvoiceFee && (
               <PricingRow
                 label="Online Report Fee"
                 value={`+ ${fmt(amount.invoiceFee)}`}
-                valueClass="font-medium text-blue-600"
+                valueClass="font-medium text-black"
+              />
+            )}
+            {flags.showSubtotal && <PricingRow label="Subtotal" value={fmt(flags.subtotalValue)} />}
+            {flags.showReferrerDiscount && (
+              <PricingRow
+                label="Media Discount"
+                value={`- ${fmt(amount.referrerDiscount)}`}
+                valueClass="font-medium text-black"
+              />
+            )}
+            {flags.showLabAdjustment && (
+              <PricingRow
+                label="Lab Adjustment"
+                value={`- ${fmt(amount.labAdjustment)}`}
+                valueClass="font-medium text-black"
               />
             )}
             <div className="flex justify-between pt-2 border-t-2 border-gray-200">
-              <span className="text-base font-semibold text-gray-900">Total Amount</span>
-              <span className="text-lg font-bold text-blue-600">{fmt(amount.final)}</span>
+              <span className="text-base font-semibold text-black">Total Amount</span>
+              <span className="text-lg font-bold text-black">{fmt(amount.final)}</span>
             </div>
             <div className="pt-2 border-t border-dashed border-gray-300 space-y-1.5">
               <div className="flex justify-between text-sm">
-                <span className="text-gray-600 flex items-center gap-1.5">
+                <span className="text-black flex items-center gap-1.5">
                   <Wallet className="w-3.5 h-3.5 text-green-600" /> Paid Amount
                 </span>
-                <span className="font-semibold text-green-600">{fmt(amount.paid)}</span>
+                <span className="font-semibold text-black">{fmt(amount.paid)}</span>
               </div>
               {!flags.isFullyPaid && (
-                <PricingRow label="Due Amount" value={fmt(flags.due)} valueClass="font-semibold text-red-600" />
+                <PricingRow label="Due Amount" value={fmt(flags.due)} valueClass="font-semibold text-black" />
               )}
               {flags.isFullyPaid && (
                 <div className="flex items-center justify-end gap-1.5 py-1 px-2 bg-green-50 rounded-lg">
                   <CheckCircle className="w-3.5 h-3.5 text-green-600" />
-                  <span className="text-green-700 text-xs font-semibold tracking-wide uppercase">Fully Paid</span>
+                  <span className="text-black text-xs font-semibold tracking-wide uppercase">Fully Paid</span>
                 </div>
               )}
             </div>
@@ -569,15 +578,14 @@ const InvoiceCard = ({ invoice, qrCodeUrl, date, time, labInfo }) => {
 
 // Small stateless helpers used only inside InvoiceCard
 const PatientField = ({ label, value }) => (
-  <div>
-    <p className="text-[10px] text-gray-500 uppercase tracking-wide mb-0.5">{label}</p>
-    <p className="text-sm font-medium text-gray-900">{value}</p>
-  </div>
+  <p className="text-sm text-black leading-snug">
+    <span className="text-black">{label}:</span> <span className="font-medium text-black">{value}</span>
+  </p>
 );
 
-const PricingRow = ({ label, value, valueClass = "font-medium text-gray-900" }) => (
+const PricingRow = ({ label, value, valueClass = "font-medium text-black" }) => (
   <div className="flex justify-between text-sm">
-    <span className="text-gray-600">{label}</span>
+    <span className="text-black">{label}</span>
     <span className={valueClass}>{value}</span>
   </div>
 );
@@ -629,7 +637,7 @@ const PrintInvoice = () => {
           await QRCode.toDataURL(normalised.reportLink, {
             width: 200,
             margin: 1,
-            color: { dark: "#2563eb", light: "#ffffff" },
+            color: { dark: "#000000", light: "#ffffff" },
           }),
         );
       } catch (err) {

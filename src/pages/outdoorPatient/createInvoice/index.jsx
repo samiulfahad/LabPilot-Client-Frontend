@@ -80,6 +80,13 @@ const toFixed2 = (n) => parseFloat(n.toFixed(2));
 
 const paymentModeLabel = (value) => PAYMENT_MODES.find((m) => m.value === value)?.label ?? value;
 
+// Punctuation/spacing-insensitive match key. Strips everything except
+// letters and digits and lowercases, so "S. GPT", "S-GPT", "S GPT" and
+// "SGPT" all collapse to the same key ("sgpt"). Used for search/filter
+// matching only — never for display, storage, or the `key` prop, which
+// keep the original name untouched.
+const normalize = (s) => (s || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+
 // ── Error helpers ────────────────────────────────────────────────────────────
 
 const PERMISSION_DENIED_MESSAGE = "আপনার কর্তৃপক্ষ আপনাকে এই কাজটি করার বা এই তথ্যটি পাওয়ার অনুমতি দেয়নি।";
@@ -414,7 +421,7 @@ const InvoiceSummary = ({ formData, amount, onConfirm, onClose }) => {
                   value={`- ${fmt(amount.referrerDiscount)}`}
                   accent="text-red-600"
                 />
-                <AmountRow label="After Referrer Discount" value={fmt(amount.afterReferrerDiscount)} border />
+                <AmountRow label="After Media Discount" value={fmt(amount.afterReferrerDiscount)} border />
               </>
             )}
             {hasLabAdjustment && amount.labAdjustment > 0 && (
@@ -555,18 +562,20 @@ const InvoiceForm = ({
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
-  // Combined filtered results
-  const q = itemQuery.trim().toLowerCase();
-  const filteredTests = q ? availableTests.filter((t) => t.name.toLowerCase().includes(q)) : availableTests;
-  const filteredProducts = q ? availableProducts.filter((p) => p.name.toLowerCase().includes(q)) : availableProducts;
+  // Combined filtered results. Matching is punctuation/spacing-insensitive
+  // (via `normalize`) so "S. GPT", "S-GPT", "S GPT" and "SGPT" all match
+  // each other regardless of how the query or the stored name is typed.
+  const q = normalize(itemQuery);
+  const filteredTests = q ? availableTests.filter((t) => normalize(t.name).includes(q)) : availableTests;
+  const filteredProducts = q ? availableProducts.filter((p) => normalize(p.name).includes(q)) : availableProducts;
   const hasResults = filteredTests.length > 0 || filteredProducts.length > 0;
 
   const filteredReferrers = referrerQuery.trim()
-    ? availableReferrers.filter((r) => r.name.toLowerCase().includes(referrerQuery.toLowerCase()))
+    ? availableReferrers.filter((r) => normalize(r.name).includes(normalize(referrerQuery)))
     : availableReferrers;
 
   const filteredDoctors = doctorQuery.trim()
-    ? availableDoctors.filter((d) => d.name.toLowerCase().includes(doctorQuery.toLowerCase()))
+    ? availableDoctors.filter((d) => normalize(d.name).includes(normalize(doctorQuery)))
     : availableDoctors;
 
   const selectReferrer = (r) => {
@@ -606,7 +615,7 @@ const InvoiceForm = ({
 
   // Lab adjustment is gated by canAdjustLab (hidden entirely if a staff has
   // a zero cap) and bounded by both the staff's max (from JWT) and the
-  // invoice total after referrer discount - admins skip the dollar cap but
+  // invoice total after Media discount - admins skip the dollar cap but
   // are still bounded by the post-discount total.
   const labAdjustmentCap = isAdmin
     ? amount.afterReferrerDiscount
@@ -1134,7 +1143,7 @@ const InvoiceForm = ({
                 checked={hasReferrerDiscount}
                 onChange={handleReferrerDiscountToggle}
                 icon={Percent}
-                label={`Apply ${useDoctorAsReferrer ? "Doctor" : "Referrer"} Discount`}
+                label={`Apply ${useDoctorAsReferrer ? "Doctor" : "Media"} Discount`}
               />
               {hasReferrerDiscount && (
                 <div className="ml-6 p-4 bg-blue-50 rounded-lg border border-blue-100 space-y-3">
@@ -1163,7 +1172,7 @@ const InvoiceForm = ({
                     />
                   </Field>
                   <div className="p-3 bg-white rounded-lg border border-blue-200 flex items-center justify-between text-sm">
-                    <span className="text-gray-600">After Referrer Discount</span>
+                    <span className="text-gray-600">After Media Discount</span>
                     <span className="font-medium text-blue-600">{fmt(amount.afterReferrerDiscount)}</span>
                   </div>
                 </div>
@@ -1391,7 +1400,7 @@ const CreateInvoice = () => {
         next.referrerDiscount = 0;
       }
       if (field === "doctor" && prev.useDoctorAsReferrer) {
-        // Doctor changed while it was powering the referrer discount — the
+        // Doctor changed while it was powering the Media discount — the
         // old discount amount no longer matches the new doctor's commission.
         next.hasReferrerDiscount = false;
         next.referrerDiscount = 0;
