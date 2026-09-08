@@ -175,6 +175,14 @@ const Field = ({ label, required, optional, children }) => (
   </div>
 );
 
+// Wheel-blur guard: number inputs otherwise respond to mouse-wheel /
+// trackpad scroll while focused, silently incrementing or decrementing
+// the value (age, discount %, lab adjustment, paid amount, etc.) — this
+// blurs the input the moment a wheel event fires so a scroll never
+// touches its value. Non-number inputs (name, contact number) are
+// untouched, and any caller-supplied onWheel still passes through.
+const blurOnWheel = (e) => e.currentTarget.blur();
+
 const IconInput = ({ icon: Icon, className = "", ...props }) => (
   <div className="relative">
     <Icon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none z-10" />
@@ -182,6 +190,7 @@ const IconInput = ({ icon: Icon, className = "", ...props }) => (
       className={`w-full pl-9 pr-4 py-2.5 border border-gray-300 rounded-lg text-sm
         focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 ${className}`}
       {...props}
+      onWheel={props.type === "number" ? blurOnWheel : props.onWheel}
     />
   </div>
 );
@@ -1079,6 +1088,7 @@ const InvoiceForm = ({
                       type="number"
                       value={product.quantity}
                       onChange={(e) => onProductQtyChange(product._id, e.target.value)}
+                      onWheel={blurOnWheel}
                       min="1"
                       max={product.hasStock ? product.stock : undefined}
                       className="w-16 text-center py-1.5 px-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
@@ -1525,7 +1535,7 @@ const CreateInvoice = () => {
             selectedProducts,
             referredBy,
             doctor,
-            link: data.link
+            link: data.link,
           },
         },
       });
