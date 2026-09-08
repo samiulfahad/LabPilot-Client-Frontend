@@ -1,14 +1,18 @@
 import { Document, Page, Text, View, StyleSheet } from "@react-pdf/renderer";
 
+// Fallback pad height (mm) used when a lab hasn't set medicalReport.padHeight
+// — mirrors the same constant/fallback in ReportViewer.jsx's buildPrintHTML.
+const DEFAULT_PAD_HEIGHT_MM = 38;
+
 const C = {
-  dark: "#0f172a",
+  dark: "#000000",
   slate700: "#334155",
-  slate600: "#475569",
-  slate400: "#94a3b8",
+  slate600: "#000000",
+  slate400: "#000000",
   slate200: "#e2e8f0",
   slate100: "#f1f5f9",
   slate50: "#f8fafc",
-  body: "#374151",
+  body: "#000000",
   normal: "#166534",
   low: "#92400e",
   high: "#991b1b",
@@ -31,11 +35,18 @@ const s = StyleSheet.create({
     backgroundColor: "white",
   },
   labName: { fontSize: 14, fontFamily: "Helvetica-Bold", color: C.dark },
-  labSub: { fontSize: 7.5, color: C.slate400, marginTop: 2, textTransform: "uppercase", letterSpacing: 1 },
-  labAddr: { fontSize: 7, color: C.slate400, marginTop: 4 },
+  labSub: {
+    fontSize: 7.5,
+    fontFamily: "Helvetica-Bold",
+    color: C.slate400,
+    marginTop: 2,
+    textTransform: "uppercase",
+    letterSpacing: 1,
+  },
+  labAddr: { fontSize: 7, fontFamily: "Helvetica-Bold", color: C.slate400, marginTop: 4 },
   headerRight: { alignItems: "flex-end" },
-  headerContact: { fontSize: 8, color: C.slate600, marginBottom: 2 },
-  headerReg: { fontSize: 7, color: C.slate400, fontFamily: "Courier" },
+  headerContact: { fontSize: 8, fontFamily: "Helvetica-Bold", color: C.slate600, marginBottom: 2 },
+  headerReg: { fontSize: 7, color: C.slate400, fontFamily: "Courier-Bold" },
 
   titleBar: {
     backgroundColor: C.slate50,
@@ -50,7 +61,14 @@ const s = StyleSheet.create({
 
   patientRow: { flexDirection: "row", borderBottom: `1 solid ${C.slate200}` },
   patientCell: { flex: 1, padding: "6 10", backgroundColor: "white", borderRight: `1 solid ${C.slate200}` },
-  cellLabel: { fontSize: 6.5, color: C.slate400, textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 2.5 },
+  cellLabel: {
+    fontSize: 6.5,
+    fontFamily: "Helvetica-Bold",
+    color: C.slate400,
+    textTransform: "uppercase",
+    letterSpacing: 0.6,
+    marginBottom: 2.5,
+  },
   cellValue: { fontSize: 9.5, fontFamily: "Helvetica-Bold", color: C.dark },
 
   referredRow: {
@@ -80,7 +98,7 @@ const s = StyleSheet.create({
     justifyContent: "space-between",
   },
   sectionName: { fontSize: 9, fontFamily: "Helvetica-Bold", color: "white" },
-  sectionCount: { fontSize: 7, color: "rgba(255,255,255,0.5)", textTransform: "uppercase", letterSpacing: 0.5 },
+  sectionCount: { fontSize: 7, color: "rgba(255,255,255,0.6)", textTransform: "uppercase", letterSpacing: 0.5 },
 
   tableHead: {
     flexDirection: "row",
@@ -91,17 +109,39 @@ const s = StyleSheet.create({
   th: {
     fontSize: 7,
     fontFamily: "Helvetica-Bold",
-    color: "#6b7280",
+    color: "#000000",
     textTransform: "uppercase",
     paddingHorizontal: 8,
     letterSpacing: 0.3,
   },
   tableRow: { flexDirection: "row", borderBottom: `1 solid ${C.slate100}`, paddingVertical: 5 },
-  td: { fontSize: 9, paddingHorizontal: 8, color: C.body },
+  td: { fontSize: 9, paddingHorizontal: 8, color: C.body, fontFamily: "Helvetica-Bold" },
   tdBold: { fontSize: 9, paddingHorizontal: 8, fontFamily: "Helvetica-Bold" },
-  tdMono: { fontSize: 9, paddingHorizontal: 8, fontFamily: "Courier", color: C.slate600 },
-  tdUnit: { fontSize: 7.5, paddingHorizontal: 8, color: C.slate400, textTransform: "uppercase" },
+  tdMono: { fontSize: 9, paddingHorizontal: 8, fontFamily: "Courier-Bold", color: C.slate600 },
+  tdUnit: {
+    fontSize: 7.5,
+    fontFamily: "Helvetica-Bold",
+    paddingHorizontal: 8,
+    color: C.slate400,
+    textTransform: "uppercase",
+  },
   pill: { paddingHorizontal: 5, paddingVertical: 1.5 },
+
+  // ── Static standard range sidebar ──────────────────────────────────────────
+  rangeBoxWrap: { border: `1 solid ${C.slate200}` },
+  rangeBoxHead: { backgroundColor: C.slate700, padding: "6 12" },
+  rangeBoxHeadText: {
+    fontSize: 8,
+    fontFamily: "Helvetica-Bold",
+    color: "white",
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
+  rangeBox: {
+    backgroundColor: C.slate50,
+    padding: 8,
+  },
+  rangeBoxText: { fontSize: 8, fontFamily: "Helvetica-Bold", color: C.slate600, lineHeight: 1.4 },
 
   footer: {
     position: "absolute",
@@ -114,10 +154,17 @@ const s = StyleSheet.create({
   },
   sigRow: { flexDirection: "row", marginBottom: 8 },
   sigBox: { flex: 1 },
-  sigLine: { borderBottom: "1 dashed #cbd5e1", height: 22, marginBottom: 3 },
-  sigLabel: { fontSize: 7, color: C.slate400 },
-  footerNote: { fontSize: 7, color: C.slate400, textAlign: "center", marginTop: 4 },
+  sigLine: { borderBottom: "1 dashed #94a3b8", height: 22, marginBottom: 3 },
+  sigLabel: { fontSize: 7, fontFamily: "Helvetica-Bold", color: C.slate400 },
+  footerNote: { fontSize: 7, fontFamily: "Helvetica-Bold", color: C.slate400, textAlign: "center", marginTop: 4 },
 });
+
+// Meta keys that live alongside the result sections on `report` but aren't
+// sections themselves — mirrors REPORT_META_KEYS in ReportViewer.jsx so the
+// PDF hides the same fields the screen/print view hides (previously this
+// only excluded _id/name, so reportDate/sampleCollectionDate could leak
+// through as a bogus section here if ever stored as an object).
+const REPORT_META_KEYS = new Set(["_id", "name", "reportDate", "sampleCollectionDate"]);
 
 function parseRange(ref) {
   if (!ref) return null;
@@ -186,10 +233,15 @@ function PDFSection({ sectionName, sectionData, showHeader }) {
   const resultEntries = entries.filter(([, v]) => isResultField(v));
   const plainEntries = entries.filter(([, v]) => !isResultField(v));
   const hasUnits = resultEntries.some(([, v]) => Boolean(v.unit));
+  const hasRange = resultEntries.some(([, v]) => Boolean(v.referenceRange));
 
-  const W = hasUnits
-    ? { param: "32%", result: "13%", unit: "10%", ref: "22%", status: "23%" }
-    : { param: "34%", result: "16%", ref: "26%", status: "24%" };
+  const W = hasRange
+    ? hasUnits
+      ? { param: "32%", result: "13%", unit: "10%", ref: "22%", status: "23%" }
+      : { param: "34%", result: "16%", ref: "26%", status: "24%" }
+    : hasUnits
+      ? { param: "40%", result: "30%", unit: "30%" }
+      : { param: "58%", result: "42%" };
 
   return (
     <View style={s.sectionWrap}>
@@ -208,23 +260,31 @@ function PDFSection({ sectionName, sectionData, showHeader }) {
             <Text style={[s.th, { width: W.param }]}>Parameter</Text>
             <Text style={[s.th, { width: W.result }]}>Result</Text>
             {hasUnits && <Text style={[s.th, { width: W.unit }]}>Unit</Text>}
-            <Text style={[s.th, { width: W.ref }]}>Ref. Range</Text>
-            <Text style={[s.th, { width: W.status }]}>Status</Text>
+            {hasRange && (
+              <>
+                <Text style={[s.th, { width: W.ref }]}>Ref. Range</Text>
+                <Text style={[s.th, { width: W.status }]}>Status</Text>
+              </>
+            )}
           </View>
           {resultEntries.map(([name, field]) => {
             const value = String(field.value ?? "");
             const ref = field.referenceRange || "";
-            const info = getStatusInfo(value, ref);
+            const info = hasRange ? getStatusInfo(value, ref) : null;
             const rc = info ? (ROW_COLORS[info.status] ?? {}) : {};
             return (
               <View key={name} style={[s.tableRow, { backgroundColor: rc.bg ?? "white" }]}>
                 <Text style={[s.td, { width: W.param }]}>{name}</Text>
                 <Text style={[s.tdBold, { width: W.result, color: rc.val ?? C.dark }]}>{value}</Text>
                 {hasUnits && <Text style={[s.tdUnit, { width: W.unit }]}>{field.unit || "—"}</Text>}
-                <Text style={[s.tdMono, { width: W.ref }]}>{ref || "—"}</Text>
-                <View style={{ width: W.status, justifyContent: "center", paddingHorizontal: 6 }}>
-                  <Pill info={info} />
-                </View>
+                {hasRange && (
+                  <>
+                    <Text style={[s.tdMono, { width: W.ref }]}>{ref || "—"}</Text>
+                    <View style={{ width: W.status, justifyContent: "center", paddingHorizontal: 6 }}>
+                      <Pill info={info} />
+                    </View>
+                  </>
+                )}
               </View>
             );
           })}
@@ -248,10 +308,19 @@ function PDFSection({ sectionName, sectionData, showHeader }) {
   );
 }
 
-export function ReportPDFDocument({ report, reportName, shortId, patient, labInfo, isIndoor = false }) {
+export function ReportPDFDocument({
+  report,
+  reportName,
+  shortId,
+  patient,
+  labInfo,
+  isIndoor = false,
+  staticStandardRange = null,
+  isPad = false,
+}) {
   const sections = Object.entries(report).filter(
     ([key, val]) =>
-      key !== "_id" && key !== "name" && val !== null && typeof val === "object" && !Array.isArray(val) && !val.$oid,
+      !REPORT_META_KEYS.has(key) && val !== null && typeof val === "object" && !Array.isArray(val) && !val.$oid,
   );
 
   let normal = 0,
@@ -277,22 +346,31 @@ export function ReportPDFDocument({ report, reportName, shortId, patient, labInf
     ...(patient.reportDate ? [{ label: "Report Date", value: patient.reportDate }] : []),
   ];
 
+  // Pad mode: leave the physical pre-printed letterhead area blank by
+  // spacing down padHeightMm (from the lab's medicalReport.padHeight
+  // setting, in mm) instead of drawing the lab header — mirrors the
+  // isPad branch in ReportViewer.jsx's buildPrintHTML (topBlock).
+  const padHeightMm = labInfo.padHeight > 0 ? labInfo.padHeight : DEFAULT_PAD_HEIGHT_MM;
+
   return (
     <Document>
       <Page size="A4" style={s.page}>
-        {/* Lab header — flat */}
-        <View style={s.header}>
-          <View>
-            <Text style={s.labName}>{labInfo.name}</Text>
-            {labInfo.tagline ? <Text style={s.labSub}>{labInfo.tagline}</Text> : null}
-            <Text style={s.labAddr}>{labInfo.address}</Text>
+        {isPad ? (
+          <View style={{ height: `${padHeightMm}mm` }} />
+        ) : (
+          <View style={s.header}>
+            <View>
+              <Text style={s.labName}>{labInfo.name}</Text>
+              {labInfo.tagline ? <Text style={s.labSub}>{labInfo.tagline}</Text> : null}
+              <Text style={s.labAddr}>{labInfo.address}</Text>
+            </View>
+            <View style={s.headerRight}>
+              <Text style={s.headerContact}>{labInfo.phone}</Text>
+              {labInfo.email ? <Text style={s.headerContact}>{labInfo.email}</Text> : null}
+              {labInfo.regNo ? <Text style={s.headerReg}>Reg: {labInfo.regNo}</Text> : null}
+            </View>
           </View>
-          <View style={s.headerRight}>
-            <Text style={s.headerContact}>{labInfo.phone}</Text>
-            {labInfo.email ? <Text style={s.headerContact}>{labInfo.email}</Text> : null}
-            {labInfo.regNo ? <Text style={s.headerReg}>Reg: {labInfo.regNo}</Text> : null}
-          </View>
-        </View>
+        )}
 
         {/* Title bar */}
         <View style={s.titleBar}>
@@ -328,35 +406,57 @@ export function ReportPDFDocument({ report, reportName, shortId, patient, labInf
           </View>
         )}
 
-        {/* Sections */}
-        <View style={{ padding: "10 14" }}>
-          {sections.map(([sectionName, sectionData]) => (
-            <PDFSection
-              key={sectionName}
-              sectionName={sectionName}
-              sectionData={sectionData}
-              showHeader={sectionData.__showTitle !== false}
-            />
-          ))}
+        {/* Sections (+ optional static standard-range sidebar) */}
+        <View
+          style={{
+            padding: "10 14",
+            flexDirection: staticStandardRange ? "row" : "column",
+            gap: staticStandardRange ? 10 : 0,
+          }}
+        >
+          <View style={{ flex: staticStandardRange ? 3 : 1 }}>
+            {sections.map(([sectionName, sectionData]) => (
+              <PDFSection
+                key={sectionName}
+                sectionName={sectionName}
+                sectionData={sectionData}
+                showHeader={sectionData.__showTitle !== false}
+              />
+            ))}
+          </View>
+
+          {staticStandardRange && (
+            <View style={[s.rangeBoxWrap, { flex: 1 }]}>
+              <View style={s.rangeBoxHead}>
+                <Text style={s.rangeBoxHeadText}>Standard Reference</Text>
+              </View>
+              <View style={s.rangeBox}>
+                <Text style={s.rangeBoxText}>{staticStandardRange}</Text>
+              </View>
+            </View>
+          )}
         </View>
 
-        {/* Footer */}
-        <View style={s.footer} fixed>
-          <View style={s.sigRow}>
-            <View style={[s.sigBox, { marginRight: 40 }]}>
-              <View style={s.sigLine} />
-              <Text style={s.sigLabel}>Pathologist Signature &amp; Seal</Text>
+        {/* Footer — omitted in Pad mode, matching footerBlock in
+            ReportViewer.jsx's buildPrintHTML (isPad ? "" : footerBlock) */}
+        {!isPad && (
+          <View style={s.footer} fixed>
+            <View style={s.sigRow}>
+              <View style={[s.sigBox, { marginRight: 40 }]}>
+                <View style={s.sigLine} />
+                <Text style={s.sigLabel}>Pathologist Signature &amp; Seal</Text>
+              </View>
+              <View style={[s.sigBox, { marginLeft: 40 }]}>
+                <View style={s.sigLine} />
+                <Text style={[s.sigLabel, { textAlign: "right" }]}>Authorized Signatory</Text>
+              </View>
             </View>
-            <View style={[s.sigBox, { marginLeft: 40 }]}>
-              <View style={s.sigLine} />
-              <Text style={[s.sigLabel, { textAlign: "right" }]}>Authorized Signatory</Text>
-            </View>
+            <Text style={s.footerNote}>
+              For qualified medical professionals only. Interpret results in full clinical context. · {labInfo.name} ·{" "}
+              {labInfo.phone}
+            </Text>
           </View>
-          <Text style={s.footerNote}>
-            For qualified medical professionals only. Interpret results in full clinical context. · {labInfo.name} ·{" "}
-            {labInfo.phone}
-          </Text>
-        </View>
+        )}
       </Page>
     </Document>
   );

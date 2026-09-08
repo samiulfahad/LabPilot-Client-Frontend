@@ -536,7 +536,7 @@ const TestActions = ({ record, test }) => {
     const state =
       _type === "indoor"
         ? { patientId: _patientId, testId, testName: name, type: "indoor", addedAt, ...(isEdit && { isEdit: true }) }
-        : { invoiceId: displayId, testId, testName: name, invoice: record, ...(isEdit && { isEdit: true }) };
+        : { invoiceId: displayId, testId, testName: name, ...(isEdit && { isEdit: true }) };
     navigate("/report-upload", { state });
   };
 

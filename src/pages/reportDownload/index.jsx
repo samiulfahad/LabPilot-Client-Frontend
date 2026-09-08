@@ -61,9 +61,6 @@ function buildLabInfo(storeLab) {
     email: storeLab.contact?.publicEmail ?? "",
     phone: storeLab.contact?.primary ?? "",
     regNo: storeLab.registrationNumber ? String(storeLab.registrationNumber) : "",
-    // In mm — sourced from the lab's medicalReport.padHeight claim (see
-    // toMedicalReportClaim in authRoutes.js). 0 means "not set"; ReportViewer
-    // falls back to a default pad height in that case.
     padHeight: storeLab.medicalReport?.padHeight ?? 0,
   };
 }
@@ -108,6 +105,7 @@ export default function ReportDownload() {
   const [report, setReport] = useState(null);
   const [patient, setPatient] = useState(null);
   const [displayId, setDisplayId] = useState(null);
+  const [staticStandardRange, setStaticStandardRange] = useState(null);
   const [loading, setLoading] = useState(true);
   const [popup, setPopup] = useState(null);
   const [offlinePopup, setOfflinePopup] = useState(false);
@@ -140,6 +138,20 @@ export default function ReportDownload() {
           sampleDate: formatDate(data.report?.sampleCollectionDate),
           reportDate: formatDate(data.report?.reportDate),
         });
+
+        // Static standard range lives on the schema (shared reference data),
+        // not on the report itself — fetch it separately and never let a
+        // failure here block the report from displaying.
+        if (data.schemaId) {
+          reportService
+            .getTestSchema(data.schemaId)
+            .then(({ data: schema }) => {
+              if (schema?.hasStaticStandardRange && schema?.staticStandardRange) {
+                setStaticStandardRange(schema.staticStandardRange);
+              }
+            })
+            .catch((e) => console.error("Failed to load schema standard range:", e));
+        }
       })
       .catch((err) => {
         if (isNetworkError(err)) {
@@ -151,11 +163,24 @@ export default function ReportDownload() {
       .finally(() => setLoading(false));
   }, []);
 
+  // Explicitly re-navigate to /report with the id in state (same pattern
+  // as ReportUpload's handleClose/goBack) instead of navigate(-1) — a
+  // plain history pop restores whatever state the /report entry
+  // originally had (often none, e.g. arriving via a plain link), leaving
+  // the search bar empty. This guarantees /report's location.key-based
+  // refetch fires with the right id.
   const handleClose = () => {
     setClosing(true);
     setTimeout(() => {
-      if (window.history.length > 1) navigate(-1);
-      else window.close();
+      if (isIndoor && displayId) {
+        navigate("/report", { state: { admissionId: displayId } });
+      } else if (!isIndoor && (displayId || invoiceId)) {
+        navigate("/report", { state: { invoiceId: displayId ?? invoiceId } });
+      } else if (window.history.length > 1) {
+        navigate(-1);
+      } else {
+        window.close();
+      }
     }, 250);
   };
 
@@ -264,6 +289,7 @@ export default function ReportDownload() {
                 printType={printType}
                 invoiceId={displayId}
                 isIndoor={isIndoor}
+                staticStandardRange={staticStandardRange}
                 {...(labInfo && { labInfo })}
               />
             </div>
