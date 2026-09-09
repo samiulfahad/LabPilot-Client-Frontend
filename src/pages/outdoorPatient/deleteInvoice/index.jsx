@@ -68,15 +68,21 @@ const DeleteInvoicePanel = ({ onDeleted, onLoadingChange, onError, onNetworkErro
   const [invoice, setInvoice] = useState(null);
   const [searching, setSearching] = useState(false);
   const [notFound, setNotFound] = useState(false);
+  const [alreadyDeleted, setAlreadyDeleted] = useState(null);
   const [confirmPopup, setConfirmPopup] = useState(false);
 
   const fetchInvoice = async (id) => {
     try {
       setSearching(true);
       setNotFound(false);
+      setAlreadyDeleted(null);
       setInvoice(null);
       const { data } = await invoiceService.getInvoiceByInvoiceId(String(id).trim());
-      data.deletion?.status ? setNotFound(true) : setInvoice(data);
+      if (data.deletion?.status) {
+        setAlreadyDeleted(data);
+      } else {
+        setInvoice(data);
+      }
     } catch (err) {
       if (isNetworkError(err)) {
         onNetworkError();
@@ -99,6 +105,7 @@ const DeleteInvoicePanel = ({ onDeleted, onLoadingChange, onError, onNetworkErro
     setSearchQuery("");
     setInvoice(null);
     setNotFound(false);
+    setAlreadyDeleted(null);
   };
 
   const handleConfirmDelete = async () => {
@@ -150,7 +157,7 @@ const DeleteInvoicePanel = ({ onDeleted, onLoadingChange, onError, onNetworkErro
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
             <input
               type="text"
-              placeholder="Enter invoice ID… e.g. APX8743"
+              placeholder="Enter invoice ID… e.g. 09090"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleSearch()}
@@ -189,6 +196,21 @@ const DeleteInvoicePanel = ({ onDeleted, onLoadingChange, onError, onNetworkErro
           <p className="text-xs text-gray-400 mt-1">
             No active invoice found with ID{" "}
             <span className="font-mono font-semibold text-gray-600">#{searchQuery}</span>
+          </p>
+        </div>
+      )}
+
+      {/* Already deleted */}
+      {alreadyDeleted && (
+        <div className="bg-white rounded-2xl shadow-sm border border-amber-100 p-6 text-center">
+          <div className="bg-amber-50 w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3">
+            <Trash2 className="w-5 h-5 text-amber-500" />
+          </div>
+          <p className="text-sm font-semibold text-gray-800">Invoice #{alreadyDeleted.invoiceId} is already deleted</p>
+          <p className="text-xs text-gray-400 mt-1">
+            {alreadyDeleted.deletion?.by?.name
+              ? `Deleted by ${alreadyDeleted.deletion.by.name} · ${formatDateTime(alreadyDeleted.deletion.at).date} · ${formatDateTime(alreadyDeleted.deletion.at).time}`
+              : `Deleted on ${formatDateTime(alreadyDeleted.deletion?.at).date} · ${formatDateTime(alreadyDeleted.deletion?.at).time}`}
           </p>
         </div>
       )}

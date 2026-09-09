@@ -20,6 +20,7 @@ import {
   AlertCircle,
   Loader2,
   CreditCard,
+  Trash2,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import invoiceService from "../../../api/invoice";
@@ -62,10 +63,13 @@ const hasReportSchemas = (inv) => (inv.tests ?? []).some((t) => t.schemaId);
 const isNetworkError = (err) => err?.isAxiosError === true && !err.response;
 
 // ── Detect what the user is typing ────────────────────────────────────────────
+// Phone numbers are still detected strictly (7-15 digits, checked first, same
+// as the backend's GET /invoice/search precedence). Anything else that's 6-7
+// characters is treated as an invoice ID — free search, no fixed pattern.
 const detectQueryType = (q) => {
   if (!q) return null;
-  if (/^\d+$/.test(q)) return "phone";
-  if (/^[A-NP-Za-np-z]{1,3}[1-9]{0,4}$/.test(q) && q.length <= 7) return "invoiceId";
+  if (/^\d{7,15}$/.test(q)) return "phone";
+  if (q.length >= 6 && q.length <= 7) return "invoiceId";
   return "name";
 };
 
@@ -464,6 +468,12 @@ const SearchInvoice = () => {
   const [popup, setPopup] = useState(null);
   const [offlinePopup, setOfflinePopup] = useState(false);
   const [focused, setFocused] = useState(false);
+  // Set only when the search response comes back with results: [] AND a
+  // deletedInvoice payload — an exact invoiceId match that exists but was
+  // soft-deleted (see GET /invoice/search's deletedInvoice field). Kept
+  // separate from `results` so it renders its own distinct banner instead
+  // of the plain "No invoices found" empty state.
+  const [deletedInvoice, setDeletedInvoice] = useState(null);
   const debounceRef = useRef(null);
 
   const queryType = detectQueryType(query.trim());
@@ -473,12 +483,14 @@ const SearchInvoice = () => {
     if (!q || q.trim().length < 2) {
       setResults([]);
       setSearched(false);
+      setDeletedInvoice(null);
       return;
     }
     try {
       setLoading(true);
       const { data } = await invoiceService.searchInvoices(q.trim());
       setResults(data.results);
+      setDeletedInvoice(data.deletedInvoice ?? null);
       setSearched(true);
     } catch (err) {
       if (isNetworkError(err)) {
@@ -502,6 +514,7 @@ const SearchInvoice = () => {
     setQuery("");
     setResults([]);
     setSearched(false);
+    setDeletedInvoice(null);
   };
 
   const handleScan = (text) => {
@@ -575,7 +588,7 @@ const SearchInvoice = () => {
               onChange={handleChange}
               onFocus={() => setFocused(true)}
               onBlur={() => setFocused(false)}
-              placeholder="01XXXXXXXXX  ·  ABT9546  ·  Patient name"
+              placeholder="01XXXXXXXXX  ·  090901  ·  Patient name"
               className="flex-1 min-w-0 bg-transparent text-sm text-gray-900 placeholder-gray-300 focus:outline-none"
             />
             {query && (
@@ -615,7 +628,7 @@ const SearchInvoice = () => {
               {
                 icon: Hash,
                 label: "Invoice ID",
-                eg: "ABT9546",
+                eg: "090901",
                 color: "bg-violet-50 text-violet-600 border-violet-100",
               },
               {
@@ -653,7 +666,21 @@ const SearchInvoice = () => {
           </div>
         )}
 
-        {searched && !loading && results.length === 0 && (
+        {searched && !loading && results.length === 0 && deletedInvoice && (
+          <div className="bg-white border border-rose-200 rounded-2xl py-14 text-center shadow-sm">
+            <div className="w-12 h-12 rounded-full bg-rose-50 border border-rose-100 flex items-center justify-center mx-auto mb-3">
+              <Trash2 className="w-5 h-5 text-rose-500" />
+            </div>
+            <p className="text-sm font-bold text-gray-700">Invoice #{deletedInvoice.invoiceId} has been deleted</p>
+            <p className="text-xs text-gray-400 mt-1">
+              {deletedInvoice.patientName && <>{deletedInvoice.patientName} · </>}
+              {deletedInvoice.deletedAt && `Deleted ${formatDateTime(deletedInvoice.deletedAt).date}`}
+              {deletedInvoice.deletedBy && ` by ${deletedInvoice.deletedBy}`}
+            </p>
+          </div>
+        )}
+
+        {searched && !loading && results.length === 0 && !deletedInvoice && (
           <div className="bg-white border border-gray-100 rounded-2xl py-14 text-center shadow-sm">
             <div className="w-12 h-12 rounded-full bg-gray-50 flex items-center justify-center mx-auto mb-3">
               <AlertCircle className="w-5 h-5 text-gray-300" />

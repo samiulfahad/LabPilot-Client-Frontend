@@ -232,6 +232,7 @@ function PDFSection({ sectionName, sectionData, showHeader }) {
   const entries = getSectionEntries(sectionData);
   const resultEntries = entries.filter(([, v]) => isResultField(v));
   const plainEntries = entries.filter(([, v]) => !isResultField(v));
+  const hasResultTable = resultEntries.length > 0;
   const hasUnits = resultEntries.some(([, v]) => Boolean(v.unit));
   const hasRange = resultEntries.some(([, v]) => Boolean(v.referenceRange));
 
@@ -254,7 +255,13 @@ function PDFSection({ sectionName, sectionData, showHeader }) {
         </View>
       )}
 
-      {resultEntries.length > 0 && (
+      {/* When the section has at least one result-style field, ALL fields —
+          including radio/select/checkbox/textarea/plain-text ones — render
+          as rows in this same table, with "—" filling the Unit/Ref-Range/
+          Status columns for non-result fields. Only when no field is
+          result-style does the section fall back to the plain two-column
+          layout below. */}
+      {hasResultTable && (
         <View>
           <View style={s.tableHead}>
             <Text style={[s.th, { width: W.param }]}>Parameter</Text>
@@ -267,22 +274,38 @@ function PDFSection({ sectionName, sectionData, showHeader }) {
               </>
             )}
           </View>
-          {resultEntries.map(([name, field]) => {
-            const value = String(field.value ?? "");
-            const ref = field.referenceRange || "";
-            const info = hasRange ? getStatusInfo(value, ref) : null;
-            const rc = info ? (ROW_COLORS[info.status] ?? {}) : {};
+          {entries.map(([name, field]) => {
+            if (isResultField(field)) {
+              const value = String(field.value ?? "");
+              const ref = field.referenceRange || "";
+              const info = hasRange ? getStatusInfo(value, ref) : null;
+              const rc = info ? (ROW_COLORS[info.status] ?? {}) : {};
+              return (
+                <View key={name} style={[s.tableRow, { backgroundColor: rc.bg ?? "white" }]}>
+                  <Text style={[s.td, { width: W.param }]}>{name}</Text>
+                  <Text style={[s.tdBold, { width: W.result, color: rc.val ?? C.dark }]}>{value}</Text>
+                  {hasUnits && <Text style={[s.tdUnit, { width: W.unit }]}>{field.unit || "—"}</Text>}
+                  {hasRange && (
+                    <>
+                      <Text style={[s.tdMono, { width: W.ref }]}>{ref || "—"}</Text>
+                      <View style={{ width: W.status, justifyContent: "center", paddingHorizontal: 6 }}>
+                        <Pill info={info} />
+                      </View>
+                    </>
+                  )}
+                </View>
+              );
+            }
+            const val = Array.isArray(field.value) ? field.value.join(", ") : String(field.value ?? "—");
             return (
-              <View key={name} style={[s.tableRow, { backgroundColor: rc.bg ?? "white" }]}>
+              <View key={name} style={[s.tableRow, { backgroundColor: "white" }]}>
                 <Text style={[s.td, { width: W.param }]}>{name}</Text>
-                <Text style={[s.tdBold, { width: W.result, color: rc.val ?? C.dark }]}>{value}</Text>
-                {hasUnits && <Text style={[s.tdUnit, { width: W.unit }]}>{field.unit || "—"}</Text>}
+                <Text style={[s.tdBold, { width: W.result }]}>{val || "—"}</Text>
+                {hasUnits && <Text style={[s.tdUnit, { width: W.unit }]}>—</Text>}
                 {hasRange && (
                   <>
-                    <Text style={[s.tdMono, { width: W.ref }]}>{ref || "—"}</Text>
-                    <View style={{ width: W.status, justifyContent: "center", paddingHorizontal: 6 }}>
-                      <Pill info={info} />
-                    </View>
+                    <Text style={[s.tdMono, { width: W.ref }]}>—</Text>
+                    <View style={{ width: W.status, justifyContent: "center", paddingHorizontal: 6 }} />
                   </>
                 )}
               </View>
@@ -291,8 +314,8 @@ function PDFSection({ sectionName, sectionData, showHeader }) {
         </View>
       )}
 
-      {plainEntries.length > 0 && (
-        <View style={{ borderTop: resultEntries.length > 0 ? `1 solid ${C.slate200}` : undefined }}>
+      {!hasResultTable && plainEntries.length > 0 && (
+        <View>
           {plainEntries.map(([name, field]) => {
             const val = Array.isArray(field.value) ? field.value.join(", ") : String(field.value ?? "—");
             return (

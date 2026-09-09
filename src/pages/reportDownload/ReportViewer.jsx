@@ -159,6 +159,38 @@ function ResultRow({ name, field, hasUnits, hasRange }) {
   );
 }
 
+// Row for a non-result field type (radio/select/checkbox/textarea/input)
+// rendered inside a section's Parameter/Result/Unit/Ref-Range/Status table
+// (i.e. the section also has at least one result-style field). The field's
+// value goes in the Result column; Unit/Ref-Range/Status are dashed out
+// since those concepts don't apply to this field type.
+function PlainValueRow({ name, field, hasUnits, hasRange }) {
+  const val = Array.isArray(field.value) ? field.value.join(", ") : String(field.value ?? "");
+  return (
+    <tr>
+      <td className="pl-4 pr-3 py-2.5 text-sm font-semibold text-black border-b border-slate-100">{name}</td>
+      <td className="px-3 py-2.5 text-sm font-bold text-black border-b border-slate-100">
+        {val || <span className="text-black">—</span>}
+      </td>
+      {hasUnits && (
+        <td className="px-3 py-2.5 text-[10px] font-bold text-black uppercase border-b border-slate-100">
+          <span className="text-black">—</span>
+        </td>
+      )}
+      {hasRange && (
+        <>
+          <td className="px-3 py-2.5 text-xs font-semibold text-black border-b border-slate-100 tabular-nums font-mono">
+            <span className="text-black">—</span>
+          </td>
+          <td className="px-3 pr-4 py-2.5 border-b border-slate-100">
+            <span className="text-xs text-black">—</span>
+          </td>
+        </>
+      )}
+    </tr>
+  );
+}
+
 function PlainRow({ name, field, colSpan }) {
   const val = Array.isArray(field.value) ? field.value.join(", ") : String(field.value ?? "—");
   return (
@@ -176,6 +208,7 @@ function Section({ sectionName, sectionData, showHeader }) {
   const entries = getSectionEntries(sectionData);
   const resultEntries = entries.filter(([, v]) => isResultField(v));
   const plainEntries = entries.filter(([, v]) => !isResultField(v));
+  const hasResultTable = resultEntries.length > 0;
   const hasUnits = resultEntries.some(([, v]) => Boolean(v.unit));
   const hasRange = resultEntries.some(([, v]) => Boolean(v.referenceRange));
 
@@ -184,58 +217,62 @@ function Section({ sectionName, sectionData, showHeader }) {
   const unitW = hasRange ? "w-[12%]" : "w-[30%]";
   const colSpan = 1 + (hasUnits ? 1 : 0) + (hasRange ? 2 : 0);
 
-  const tableBody = (
-    <>
-      {resultEntries.length > 0 && (
-        <table className="w-full border-collapse">
-          <thead>
-            <tr className="bg-slate-50 border-b border-slate-200">
-              <th
-                className={`pl-4 pr-3 py-2 text-left text-[10px] font-bold text-black uppercase tracking-wider ${paramW}`}
-              >
-                Parameter
+  // When the section has at least one result-style field (a number field
+  // with a unit/reference range), every field in the section — including
+  // radio/select/checkbox/textarea/plain-text ones — renders as a row in
+  // that same Parameter/Result/Unit/Ref-Range/Status table, with "—" filled
+  // into the columns a non-result field doesn't have. Only when no field in
+  // the section is result-style does the section fall back to the plain
+  // two-column table.
+  const tableBody = hasResultTable ? (
+    <table className="w-full border-collapse">
+      <thead>
+        <tr className="bg-slate-50 border-b border-slate-200">
+          <th
+            className={`pl-4 pr-3 py-2 text-left text-[10px] font-bold text-black uppercase tracking-wider ${paramW}`}
+          >
+            Parameter
+          </th>
+          <th className={`px-3 py-2 text-left text-[10px] font-bold text-black uppercase tracking-wider ${resultW}`}>
+            Result
+          </th>
+          {hasUnits && (
+            <th className={`px-3 py-2 text-left text-[10px] font-bold text-black uppercase tracking-wider ${unitW}`}>
+              Unit
+            </th>
+          )}
+          {hasRange && (
+            <>
+              <th className="px-3 py-2 text-left text-[10px] font-bold text-black uppercase tracking-wider w-[24%]">
+                Ref. Range
               </th>
-              <th
-                className={`px-3 py-2 text-left text-[10px] font-bold text-black uppercase tracking-wider ${resultW}`}
-              >
-                Result
+              <th className="px-3 pr-4 py-2 text-left text-[10px] font-bold text-black uppercase tracking-wider w-[18%]">
+                Status
               </th>
-              {hasUnits && (
-                <th
-                  className={`px-3 py-2 text-left text-[10px] font-bold text-black uppercase tracking-wider ${unitW}`}
-                >
-                  Unit
-                </th>
-              )}
-              {hasRange && (
-                <>
-                  <th className="px-3 py-2 text-left text-[10px] font-bold text-black uppercase tracking-wider w-[24%]">
-                    Ref. Range
-                  </th>
-                  <th className="px-3 pr-4 py-2 text-left text-[10px] font-bold text-black uppercase tracking-wider w-[18%]">
-                    Status
-                  </th>
-                </>
-              )}
-            </tr>
-          </thead>
-          <tbody>
-            {resultEntries.map(([n, f]) => (
-              <ResultRow key={n} name={n} field={f} hasUnits={hasUnits} hasRange={hasRange} />
-            ))}
-          </tbody>
-        </table>
-      )}
-      {plainEntries.length > 0 && (
-        <table className={`w-full border-collapse ${resultEntries.length > 0 ? "border-t border-slate-200" : ""}`}>
-          <tbody>
-            {plainEntries.map(([n, f]) => (
-              <PlainRow key={n} name={n} field={f} colSpan={colSpan} />
-            ))}
-          </tbody>
-        </table>
-      )}
-    </>
+            </>
+          )}
+        </tr>
+      </thead>
+      <tbody>
+        {entries.map(([n, f]) =>
+          isResultField(f) ? (
+            <ResultRow key={n} name={n} field={f} hasUnits={hasUnits} hasRange={hasRange} />
+          ) : (
+            <PlainValueRow key={n} name={n} field={f} hasUnits={hasUnits} hasRange={hasRange} />
+          ),
+        )}
+      </tbody>
+    </table>
+  ) : (
+    plainEntries.length > 0 && (
+      <table className="w-full border-collapse">
+        <tbody>
+          {plainEntries.map(([n, f]) => (
+            <PlainRow key={n} name={n} field={f} colSpan={colSpan} />
+          ))}
+        </tbody>
+      </table>
+    )
   );
 
   if (!showHeader) {
@@ -383,6 +420,7 @@ function buildPrintHTML({
     const entries = getSectionEntries(sectionData);
     const resultEntries = entries.filter(([, v]) => isResultField(v));
     const plainEntries = entries.filter(([, v]) => !isResultField(v));
+    const hasResultTable = resultEntries.length > 0;
     const hasUnits = resultEntries.some(([, v]) => Boolean(v.unit));
     const hasRange = resultEntries.some(([, v]) => Boolean(v.referenceRange));
 
@@ -400,22 +438,37 @@ function buildPrintHTML({
          <th style="padding:5px 10px;text-align:left;font-size:8.5px;font-weight:700;color:#000000;text-transform:uppercase;letter-spacing:.05em;width:18%;">Status</th>`
       : "";
 
-    const resultRows = resultEntries
+    // When the section has at least one result-style field, ALL fields —
+    // including radio/select/checkbox/textarea/plain-text ones — render as
+    // rows in this same table, with "—" filling the Unit/Ref-Range/Status
+    // columns for non-result fields. Only when no field is result-style
+    // does the section fall back to the plain two-column table below.
+    const combinedRows = entries
       .map(([name, field]) => {
-        const ref = field.referenceRange || "";
-        const info = hasRange ? statusInfo(field.value, ref) : null;
-        const s = info ? info.status : null;
-        const rangeCells = hasRange
-          ? `<td style="padding:6px 10px;font-size:10.5px;color:#000000;font-weight:600;border-bottom:1px solid #f1f5f9;font-family:monospace;">${ref || "—"}</td>
+        if (isResultField(field)) {
+          const ref = field.referenceRange || "";
+          const info = hasRange ? statusInfo(field.value, ref) : null;
+          const s = info ? info.status : null;
+          const rangeCells = hasRange
+            ? `<td style="padding:6px 10px;font-size:10.5px;color:#000000;font-weight:600;border-bottom:1px solid #f1f5f9;font-family:monospace;">${ref || "—"}</td>
         <td style="padding:6px 10px;border-bottom:1px solid #f1f5f9;">
           <span style="font-size:8.5px;font-weight:700;padding:2px 7px;background:${pillBg(s)};color:${pillColor(s)};border:1px solid ${pillBdr(s)};">${info ? info.label : "—"}</span>
         </td>`
-          : "";
-        return `<tr style="background:${rowBg(s)};">
+            : "";
+          return `<tr style="background:${rowBg(s)};">
         <td style="padding:6px 10px;font-size:11.5px;font-weight:600;color:#000000;border-bottom:1px solid #f1f5f9;">${name}</td>
         <td style="padding:6px 10px;font-size:11.5px;font-weight:700;color:${valColor(s)};border-bottom:1px solid #f1f5f9;font-family:monospace;">${field.value}</td>
         ${hasUnits ? `<td style="padding:6px 10px;font-size:9px;font-weight:700;color:#000000;text-transform:uppercase;border-bottom:1px solid #f1f5f9;">${field.unit || "—"}</td>` : ""}
         ${rangeCells}
+      </tr>`;
+        }
+        const val = Array.isArray(field.value) ? field.value.join(", ") : String(field.value ?? "—");
+        const dash = `<td style="padding:6px 10px;font-size:10px;color:#000000;font-weight:600;border-bottom:1px solid #f1f5f9;">—</td>`;
+        return `<tr>
+        <td style="padding:6px 10px;font-size:11.5px;font-weight:600;color:#000000;border-bottom:1px solid #f1f5f9;">${name}</td>
+        <td style="padding:6px 10px;font-size:11.5px;font-weight:700;color:#000000;border-bottom:1px solid #f1f5f9;">${val || "—"}</td>
+        ${hasUnits ? dash : ""}
+        ${hasRange ? `${dash}<td style="padding:6px 10px;border-bottom:1px solid #f1f5f9;"><span style="font-size:8.5px;font-weight:700;padding:2px 7px;color:#000000;">—</span></td>` : ""}
       </tr>`;
       })
       .join("");
@@ -434,22 +487,21 @@ function buildPrintHTML({
          </div>`
       : "";
 
-    const resultTable =
-      resultEntries.length > 0
-        ? `<table style="width:100%;border-collapse:collapse;">
+    const resultTable = hasResultTable
+      ? `<table style="width:100%;border-collapse:collapse;">
           <thead><tr style="background:#f8fafc;border-bottom:1px solid #e2e8f0;">
             <th style="padding:5px 10px;text-align:left;font-size:8.5px;font-weight:700;color:#000000;text-transform:uppercase;letter-spacing:.05em;width:${paramW};">Parameter</th>
             <th style="padding:5px 10px;text-align:left;font-size:8.5px;font-weight:700;color:#000000;text-transform:uppercase;letter-spacing:.05em;width:${resultW};">Result</th>
             ${unitHeader}
             ${rangeHeaders}
           </tr></thead>
-          <tbody>${resultRows}</tbody>
+          <tbody>${combinedRows}</tbody>
         </table>`
-        : "";
+      : "";
 
     const plainTable =
-      plainEntries.length > 0
-        ? `<table style="width:100%;border-collapse:collapse;${resultEntries.length > 0 ? "border-top:1px solid #e2e8f0;" : ""}"><tbody>${plainRows}</tbody></table>`
+      !hasResultTable && plainEntries.length > 0
+        ? `<table style="width:100%;border-collapse:collapse;"><tbody>${plainRows}</tbody></table>`
         : "";
 
     return `<div style="border:1px solid #e2e8f0;margin-bottom:10px;page-break-inside:avoid;">${headerHTML}${resultTable}${plainTable}</div>`;

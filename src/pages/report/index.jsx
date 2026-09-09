@@ -25,6 +25,7 @@ import {
   AlertCircle,
   Hash,
   Info,
+  Trash2,
 } from "lucide-react";
 import { useLocation, useNavigate, Link } from "react-router-dom";
 import Popup from "../../components/popup";
@@ -35,10 +36,13 @@ import PrintId from "../../components/PrintId";
 import { useAuthStore } from "../../store/authStore";
 
 // ─── ID Format Detection ──────────────────────────────────────────────────────
-
+// Indoor admission IDs keep their specific pattern (IP + 3 digits + 2 letters,
+// 7 chars) and are checked first. Anything else that's 6-7 characters is
+// treated as an outdoor invoice ID — no fixed character pattern required.
 const detectIdType = (id) => {
-  if (/^IP[1-9]{3}[A-NP-Z]{2}$/i.test(id.trim())) return "indoor";
-  if (/^[A-NP-Z]{3}[1-9]{4}$/i.test(id.trim())) return "outdoor";
+  const trimmed = id.trim();
+  if (/^IP[1-9]{3}[A-NP-Z]{2}$/i.test(trimmed)) return "indoor";
+  if (trimmed.length >= 6 && trimmed.length <= 7) return "outdoor";
   return null;
 };
 
@@ -874,6 +878,12 @@ const Report = () => {
   const [notFound, setNotFound] = useState(false);
   const [invalidId, setInvalidId] = useState(false);
   const [networkError, setNetworkError] = useState(false);
+  // Distinct from notFound: the invoice/admission exists but was
+  // soft-deleted (backend signals this with 410 + { deleted: true }
+  // instead of a plain 404 — see findReportableInvoice in
+  // outdoorReportRoutes.js). Kept as the raw error message from the
+  // response so the banner can show backend-provided context if it varies.
+  const [deletedInfo, setDeletedInfo] = useState(null);
 
   const location = useLocation();
 
@@ -883,12 +893,14 @@ const Report = () => {
       setInvalidId(true);
       setRecord(null);
       setNotFound(false);
+      setDeletedInfo(null);
       return;
     }
     try {
       setSearching(true);
       setNotFound(false);
       setInvalidId(false);
+      setDeletedInfo(null);
       setRecord(null);
       if (type === "outdoor") {
         const res = await reportService.getOutdoorPatient(id.trim().toUpperCase());
@@ -900,6 +912,8 @@ const Report = () => {
     } catch (err) {
       if (isNetworkError(err)) {
         setNetworkError(true);
+      } else if (err?.response?.status === 410 && err?.response?.data?.deleted) {
+        setDeletedInfo(err.response.data.error ?? "This invoice has been deleted");
       } else if (err?.response?.status === 404) {
         setNotFound(true);
       } else {
@@ -938,6 +952,7 @@ const Report = () => {
     setRecord(null);
     setNotFound(false);
     setInvalidId(false);
+    setDeletedInfo(null);
   };
 
   const handleDatesSaved = (testId, addedAt, dates) => {
@@ -1017,7 +1032,7 @@ const Report = () => {
           <div className="flex items-center gap-2 mt-3">
             <span className="text-[11px] text-gray-400 font-medium">e.g.</span>
             <span className="font-['IBM_Plex_Mono'] text-[11px] font-semibold text-gray-600 bg-gray-100 px-2 py-0.5 rounded-lg">
-              APX8743
+              090901
             </span>
             <span className="text-gray-300">·</span>
             <span className="font-['IBM_Plex_Mono'] text-[11px] font-semibold text-gray-600 bg-gray-100 px-2 py-0.5 rounded-lg">
@@ -1037,7 +1052,7 @@ const Report = () => {
             <p className="text-xs text-gray-500 leading-relaxed">
               Invoice:{" "}
               <span className="font-['IBM_Plex_Mono'] font-bold text-gray-700 bg-gray-100 px-1.5 py-0.5 rounded-lg">
-                APX8743
+                090901
               </span>
               {"  ·  "}
               Admission:{" "}
@@ -1059,6 +1074,23 @@ const Report = () => {
               <span className="font-['IBM_Plex_Mono'] font-bold text-gray-700 bg-gray-100 px-1.5 py-0.5 rounded-lg">
                 #{searchQuery.toUpperCase()}
               </span>
+            </p>
+          </div>
+        )}
+
+        {!searching && deletedInfo && (
+          <div className={`bg-white border ${RUST.border} rounded-2xl p-8 text-center shadow-sm fu fu2`}>
+            <div
+              className={`w-12 h-12 rounded-2xl ${RUST.bg} border ${RUST.border} flex items-center justify-center mx-auto mb-3`}
+            >
+              <Trash2 className={`w-6 h-6 ${RUST.text}`} />
+            </div>
+            <p className="text-sm font-black text-gray-800 mb-1.5">এই ইনভয়েসটি ডিলিট করা হয়েছে</p>
+            <p className="text-xs text-gray-500">
+              <span className="font-['IBM_Plex_Mono'] font-bold text-gray-700 bg-gray-100 px-1.5 py-0.5 rounded-lg">
+                #{searchQuery.toUpperCase()}
+              </span>{" "}
+              {deletedInfo}
             </p>
           </div>
         )}
