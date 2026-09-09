@@ -133,8 +133,8 @@ const pdf$ = StyleSheet.create({
     paddingRight: PAGE_MARGIN,
   },
   // header — centered, white bg, black text. Invoice ID / date / time no
-  // longer live up here — ID moved beneath the QR code, date/time moved
-  // into the patient grid — so this is now just the lab identity block.
+  // longer live up here — ID moved into the patient grid, date/time moved
+  // into the patient grid too — so this is now just the lab identity block.
   header: {
     alignItems: "center",
     borderBottom: "1.5 solid #e5e7eb",
@@ -164,20 +164,21 @@ const pdf$ = StyleSheet.create({
   // sections — horizontal inset now comes solely from the page padding
   section: { paddingTop: 12, paddingBottom: 12, borderBottom: "1 solid #e5e7eb" },
   sectionLast: { paddingTop: 12 },
-  // patient grid — three columns: Full Name / Gender / Date, then
-  // Age / Contact / Time, with Doctor's Name (when present) spanning all three.
+  // patient grid — three columns. Invoice ID (1/3) and Full Name (2/3) share
+  // the first row, then Gender / Age / Date / Contact / Time fill in as
+  // before, with Doctor's Name (when present) spanning all three.
   patientRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" },
   patientGrid: { flex: 1, flexDirection: "row", flexWrap: "wrap" },
   patientField: { width: "33.33%", marginBottom: 6, paddingRight: 6 },
+  patientFieldWide: { width: "66.66%", marginBottom: 6, paddingRight: 6 },
   patientFieldFull: { width: "100%", marginBottom: 6 },
   fieldInline: { fontSize: 8.5, color: "#000000" },
   fieldLabelLine: { fontFamily: "Helvetica", fontSize: 8.5, color: "#000000" },
   fieldValueLine: { fontFamily: "Helvetica-Bold", fontSize: 8.5, color: "#000000" },
-  // QR — Invoice ID now displayed here, directly under the QR code.
+  // QR — Invoice ID no longer displayed here (moved into the patient grid).
   qrContainer: { alignItems: "center", marginLeft: 16 },
   qrImage: { width: 60, height: 60 },
   qrLabel: { fontSize: 6.5, color: "#000000", textAlign: "center", marginTop: 3 },
-  qrInvoiceId: { fontSize: 7.5, fontFamily: "Helvetica-Bold", color: "#000000", textAlign: "center", marginTop: 3 },
   dlBtnWrapper: { marginTop: 6, position: "relative" },
   dlBtn: {
     backgroundColor: "#2563eb",
@@ -263,7 +264,8 @@ const InvoicePDF = ({ invoice, qrCodeUrl, date, time, labInfo, hideDownloadButto
         <View style={pdf$.section}>
           <View style={pdf$.patientRow}>
             <View style={pdf$.patientGrid}>
-              <PDFField label="Full Name" value={patient.name} style={pdf$.patientFieldFull} />
+              <PDFField label="Invoice ID" value={invoiceId || "N/A"} style={pdf$.patientField} />
+              <PDFField label="Full Name" value={patient.name} style={pdf$.patientFieldWide} />
               <PDFField label="Gender" value={patient.gender} style={pdf$.patientField} />
               <PDFField label="Age" value={`${patient.age} years`} style={pdf$.patientField} />
               <PDFField label="Date" value={date} style={pdf$.patientField} />
@@ -277,7 +279,6 @@ const InvoicePDF = ({ invoice, qrCodeUrl, date, time, labInfo, hideDownloadButto
               <View style={pdf$.qrContainer}>
                 <Image style={pdf$.qrImage} src={qrCodeUrl} />
                 <Text style={pdf$.qrLabel}>Scan to download Reports</Text>
-                <Text style={pdf$.qrInvoiceId}>Invoice ID: {invoiceId || "N/A"}</Text>
                 {!hideDownloadButton && (
                   <View style={pdf$.dlBtnWrapper}>
                     <View style={pdf$.dlBtn}>
@@ -439,11 +440,15 @@ const InvoiceCard = ({ invoice, qrCodeUrl, date, time, labInfo }) => {
         </div>
       </div>
 
-      {/* Patient — three columns: Full Name / Gender / Date, then Age / Contact / Time */}
+      {/* Patient — Invoice ID (1/3) and Full Name (2/3) share the first row,
+          then Gender / Age / Date / Contact / Time fill in as before. */}
       <div className="px-6 py-4 border-b border-gray-200">
         <div className="flex items-start gap-4">
           <div className="grid grid-cols-3 gap-x-4 gap-y-2 flex-1">
-            <PatientField label="Full Name" value={patient.name} />
+            <PatientField label="Invoice ID" value={invoiceId || "N/A"} />
+            <div className="col-span-2">
+              <PatientField label="Full Name" value={patient.name} />
+            </div>
             <PatientField label="Gender" value={<span className="capitalize">{patient.gender}</span>} />
             <PatientField label="Date" value={date} />
             <PatientField label="Age" value={`${patient.age} years`} />
@@ -459,7 +464,6 @@ const InvoiceCard = ({ invoice, qrCodeUrl, date, time, labInfo }) => {
             <div className="shrink-0 flex flex-col items-center gap-0.5">
               <img src={qrCodeUrl} alt="QR Code" className="w-20 h-20" />
               <p className="text-[9px] text-black text-center leading-tight">Scan to download Reports</p>
-              <p className="text-[10px] font-semibold text-black text-center">Invoice ID: {invoiceId || "N/A"}</p>
               <a
                 href={reportLink}
                 target="_blank"
