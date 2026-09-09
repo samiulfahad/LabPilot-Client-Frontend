@@ -531,6 +531,15 @@ const InvoiceForm = ({
   const [showItemDrop, setShowItemDrop] = useState(false);
   const itemDropRef = useRef(null);
 
+  // ── Keyboard navigation state ──────────────────────────────────────────
+  // -1 means "nothing highlighted" (input itself is effectively focused).
+  const [referrerActiveIndex, setReferrerActiveIndex] = useState(-1);
+  const [doctorActiveIndex, setDoctorActiveIndex] = useState(-1);
+  const [itemActiveIndex, setItemActiveIndex] = useState(-1);
+  const referrerOptionRefs = useRef([]);
+  const doctorOptionRefs = useRef([]);
+  const itemOptionRefs = useRef([]);
+
   const {
     patient,
     referredBy,
@@ -570,6 +579,19 @@ const InvoiceForm = ({
   const filteredProducts = q ? availableProducts.filter((p) => normalize(p.name).includes(q)) : availableProducts;
   const hasResults = filteredTests.length > 0 || filteredProducts.length > 0;
 
+  // Flat list mirroring render order (tests, then products) so arrow-key
+  // index maps 1:1 onto what's on screen. Out-of-stock products stay in
+  // the list (so they can still be scrolled past / skipped) but are
+  // marked selectable: false — Enter is a no-op on them, same as a click.
+  const itemFlatList = [
+    ...filteredTests.map((t) => ({ kind: "test", data: t, selectable: true })),
+    ...filteredProducts.map((p) => ({
+      kind: "product",
+      data: p,
+      selectable: !(p.hasStock && p.stock === 0),
+    })),
+  ];
+
   const filteredReferrers = referrerQuery.trim()
     ? availableReferrers.filter((r) => normalize(r.name).includes(normalize(referrerQuery)))
     : availableReferrers;
@@ -578,16 +600,75 @@ const InvoiceForm = ({
     ? availableDoctors.filter((d) => normalize(d.name).includes(normalize(doctorQuery)))
     : availableDoctors;
 
+  // Reset highlight whenever the underlying list changes (new query, drop
+  // opened/closed) so a stale index doesn't point at the wrong row.
+  useEffect(() => {
+    setReferrerActiveIndex(-1);
+  }, [referrerQuery, showReferrerDrop, useDoctorAsReferrer]);
+
+  useEffect(() => {
+    setDoctorActiveIndex(-1);
+  }, [doctorQuery, showDoctorDrop]);
+
+  useEffect(() => {
+    setItemActiveIndex(-1);
+  }, [itemQuery, showItemDrop]);
+
+  // Keep the highlighted row scrolled into view as it moves via keyboard.
+  const scrollActiveIntoView = (refsArr, index) => {
+    const el = refsArr.current[index];
+    if (el) el.scrollIntoView({ block: "nearest" });
+  };
+
   const selectReferrer = (r) => {
     onChange("referredBy", r);
     setShowReferrerDrop(false);
     setReferrerQuery("");
+    setReferrerActiveIndex(-1);
   };
 
   const selectDoctor = (d) => {
     onChange("doctor", d);
     setShowDoctorDrop(false);
     setDoctorQuery("");
+    setDoctorActiveIndex(-1);
+  };
+
+  const selectItem = (entry) => {
+    if (!entry || !entry.selectable) return;
+    if (entry.kind === "test") onTestToggle(entry.data);
+    else onProductToggle(entry.data);
+    setItemQuery("");
+    setShowItemDrop(false);
+    setItemActiveIndex(-1);
+  };
+
+  // Generic arrow/enter/escape handler shared by the three search inputs.
+  const handleDropdownKeyDown = (e, { isOpen, list, activeIndex, setActiveIndex, onSelect, refsArr, closeDrop }) => {
+    if (!isOpen || list.length === 0) return;
+
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      const next = activeIndex < list.length - 1 ? activeIndex + 1 : 0;
+      setActiveIndex(next);
+      scrollActiveIntoView(refsArr, next);
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      const next = activeIndex > 0 ? activeIndex - 1 : list.length - 1;
+      setActiveIndex(next);
+      scrollActiveIntoView(refsArr, next);
+    } else if (e.key === "Enter") {
+      if (activeIndex >= 0 && activeIndex < list.length) {
+        e.preventDefault();
+        onSelect(list[activeIndex]);
+      }
+      // If nothing is highlighted, let Enter fall through (e.g. the
+      // referrer/doctor onBlur-style "use typed name" behavior still
+      // works since the input itself handles that on blur, not here).
+    } else if (e.key === "Escape") {
+      setActiveIndex(-1);
+      closeDrop();
+    }
   };
 
   const referrerDisplayValue = referredBy && typeof referredBy === "object" ? referredBy.name : referrerQuery;
@@ -724,6 +805,17 @@ const InvoiceForm = ({
                       setShowDoctorDrop(true);
                     }}
                     onFocus={() => setShowDoctorDrop(true)}
+                    onKeyDown={(e) =>
+                      handleDropdownKeyDown(e, {
+                        isOpen: showDoctorDrop && !!doctorQuery,
+                        list: filteredDoctors,
+                        activeIndex: doctorActiveIndex,
+                        setActiveIndex: setDoctorActiveIndex,
+                        onSelect: selectDoctor,
+                        refsArr: doctorOptionRefs,
+                        closeDrop: () => setShowDoctorDrop(false),
+                      })
+                    }
                     onBlur={() => {
                       // NOTE: typeof null === "object" in JS, so `doctor` being
                       // its initial `null` value must be checked explicitly —
@@ -749,15 +841,19 @@ const InvoiceForm = ({
                 {showDoctorDrop && doctorQuery && (
                   <div className="absolute top-full mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto z-20">
                     {filteredDoctors.length > 0 ? (
-                      filteredDoctors.map((d) => (
+                      filteredDoctors.map((d, idx) => (
                         <button
                           key={d._id}
                           type="button"
+                          ref={(el) => (doctorOptionRefs.current[idx] = el)}
                           onMouseDown={(e) => {
                             e.preventDefault();
                             selectDoctor(d);
                           }}
-                          className="w-full px-4 py-3 text-left hover:bg-gray-50 border-b border-gray-100 last:border-0"
+                          onMouseEnter={() => setDoctorActiveIndex(idx)}
+                          className={`w-full px-4 py-3 text-left border-b border-gray-100 last:border-0 ${
+                            idx === doctorActiveIndex ? "bg-blue-50" : "hover:bg-gray-50"
+                          }`}
                         >
                           <p className="font-medium text-gray-900 text-sm">{d.name}</p>
                           {d.degree && <p className="text-xs text-gray-500 mt-0.5">{d.degree}</p>}
@@ -822,6 +918,17 @@ const InvoiceForm = ({
                       setShowReferrerDrop(true);
                     }}
                     onFocus={() => setShowReferrerDrop(true)}
+                    onKeyDown={(e) =>
+                      handleDropdownKeyDown(e, {
+                        isOpen: showReferrerDrop && !!referrerQuery && !useDoctorAsReferrer,
+                        list: filteredReferrers,
+                        activeIndex: referrerActiveIndex,
+                        setActiveIndex: setReferrerActiveIndex,
+                        onSelect: selectReferrer,
+                        refsArr: referrerOptionRefs,
+                        closeDrop: () => setShowReferrerDrop(false),
+                      })
+                    }
                     onBlur={() => {
                       // Same null-vs-"object" gotcha as the Doctor field above —
                       // `referredBy` starts as `null`, and `typeof null` is
@@ -846,15 +953,19 @@ const InvoiceForm = ({
                 {showReferrerDrop && referrerQuery && !useDoctorAsReferrer && (
                   <div className="absolute top-full mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto z-20">
                     {filteredReferrers.length > 0 ? (
-                      filteredReferrers.map((r) => (
+                      filteredReferrers.map((r, idx) => (
                         <button
                           key={r._id}
                           type="button"
+                          ref={(el) => (referrerOptionRefs.current[idx] = el)}
                           onMouseDown={(e) => {
                             e.preventDefault();
                             selectReferrer(r);
                           }}
-                          className="w-full px-4 py-3 text-left hover:bg-gray-50 border-b border-gray-100 last:border-0"
+                          onMouseEnter={() => setReferrerActiveIndex(idx)}
+                          className={`w-full px-4 py-3 text-left border-b border-gray-100 last:border-0 ${
+                            idx === referrerActiveIndex ? "bg-blue-50" : "hover:bg-gray-50"
+                          }`}
                         >
                           <div className="flex items-center justify-between">
                             <div>
@@ -923,6 +1034,17 @@ const InvoiceForm = ({
                 setShowItemDrop(true);
               }}
               onFocus={() => setShowItemDrop(true)}
+              onKeyDown={(e) =>
+                handleDropdownKeyDown(e, {
+                  isOpen: showItemDrop && !!itemQuery,
+                  list: itemFlatList,
+                  activeIndex: itemActiveIndex,
+                  setActiveIndex: setItemActiveIndex,
+                  onSelect: selectItem,
+                  refsArr: itemOptionRefs,
+                  closeDrop: () => setShowItemDrop(false),
+                })
+              }
               className="w-full pl-9 pr-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
               placeholder="Search tests or products..."
             />
@@ -938,18 +1060,22 @@ const InvoiceForm = ({
                       <div className="px-4 py-2 bg-gray-50 border-b border-gray-100 sticky top-0">
                         <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Tests</span>
                       </div>
-                      {filteredTests.map((test) => {
+                      {filteredTests.map((test, idx) => {
                         const selected = selectedTests.some((t) => t.testId === test.testId);
+                        const active = idx === itemActiveIndex;
                         return (
                           <button
                             key={test.testId}
                             type="button"
+                            ref={(el) => (itemOptionRefs.current[idx] = el)}
                             onMouseDown={(e) => {
                               e.preventDefault();
-                              onTestToggle(test);
-                              setItemQuery("");
+                              selectItem(itemFlatList[idx]);
                             }}
-                            className={`w-full px-4 py-3 text-left hover:bg-gray-50 border-b border-gray-100 last:border-0 transition-colors ${selected ? "bg-blue-50" : ""}`}
+                            onMouseEnter={() => setItemActiveIndex(idx)}
+                            className={`w-full px-4 py-3 text-left border-b border-gray-100 last:border-0 transition-colors ${
+                              active ? "bg-blue-100" : selected ? "bg-blue-50" : "hover:bg-gray-50"
+                            }`}
                           >
                             <div className="flex items-center justify-between">
                               <div>
@@ -974,24 +1100,25 @@ const InvoiceForm = ({
                       <div className="px-4 py-2 bg-gray-50 border-b border-gray-100 sticky top-0">
                         <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Products</span>
                       </div>
-                      {filteredProducts.map((product) => {
+                      {filteredProducts.map((product, pIdx) => {
+                        const idx = filteredTests.length + pIdx; // offset into the flat list
                         const selected = selectedProducts.some((p) => p._id === product._id);
                         const outOfStock = product.hasStock && product.stock === 0;
+                        const active = idx === itemActiveIndex;
                         return (
                           <button
                             key={product._id}
                             type="button"
                             disabled={outOfStock}
+                            ref={(el) => (itemOptionRefs.current[idx] = el)}
                             onMouseDown={(e) => {
                               e.preventDefault();
-                              if (!outOfStock) {
-                                onProductToggle(product);
-                                setItemQuery("");
-                              }
+                              if (!outOfStock) selectItem(itemFlatList[idx]);
                             }}
+                            onMouseEnter={() => setItemActiveIndex(idx)}
                             className={`w-full px-4 py-3 text-left border-b border-gray-100 last:border-0 transition-colors
-                              ${outOfStock ? "opacity-40 cursor-not-allowed" : "hover:bg-gray-50"}
-                              ${selected ? "bg-blue-50" : ""}`}
+                              ${outOfStock ? "opacity-40 cursor-not-allowed" : ""}
+                              ${active && !outOfStock ? "bg-blue-100" : selected ? "bg-blue-50" : !outOfStock ? "hover:bg-gray-50" : ""}`}
                           >
                             <div className="flex items-center justify-between">
                               <div>
