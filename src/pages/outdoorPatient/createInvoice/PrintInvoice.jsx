@@ -194,8 +194,11 @@ const pdf$ = StyleSheet.create({
   dlBtnText: { color: "#ffffff", fontFamily: "Helvetica-Bold", fontSize: 7 },
   // table
   tableHeader: { flexDirection: "row", backgroundColor: "#f3f4f6", padding: "5 8", borderBottom: "1 solid #e5e7eb" },
-  tableRow: { flexDirection: "row", padding: "5 8", borderBottom: "1 solid #f3f4f6" },
-  tableRowEven: { flexDirection: "row", padding: "5 8", borderBottom: "1 solid #f3f4f6", backgroundColor: "#fafafa" },
+  // Row vertical padding halved (5 -> 2.5) so more test/product lines fit on
+  // a single A5 page before the pricing summary gets pushed to a second page.
+  // Header row above is untouched so it stays comfortably readable.
+  tableRow: { flexDirection: "row", padding: "2.5 8", borderBottom: "1 solid #f3f4f6" },
+  tableRowEven: { flexDirection: "row", padding: "2.5 8", borderBottom: "1 solid #f3f4f6", backgroundColor: "#fafafa" },
   colNum: { width: "8%", fontSize: 8, color: "#000000" },
   colName: { flex: 1, fontSize: 8, color: "#000000" },
   colPrice: { width: "25%", fontSize: 8, textAlign: "right", fontFamily: "Helvetica-Bold", color: "#000000" },
