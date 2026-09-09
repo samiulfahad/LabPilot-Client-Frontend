@@ -95,6 +95,10 @@ const blurInput = (e) => {
   e.target.style.borderColor = "#E2E8F0";
   e.target.style.boxShadow = "";
 };
+// Number inputs otherwise change value on mouse-wheel scroll while focused
+// (browser default behavior) — blur on wheel so scrolling the page never
+// silently edits a price/commission value.
+const blockWheelChange = (e) => e.target.blur();
 
 // ══════════════════════════════════════════════════════════════════════════════
 // Format Modal
@@ -442,6 +446,7 @@ const AmountModal = ({ field, test, onClose, onSave, onNetworkError }) => {
                 className={`${inputBase} pl-7 pr-3 py-2.5 text-sm`}
                 onFocus={focusInput}
                 onBlur={blurInput}
+                onWheel={blockWheelChange}
               />
             </div>
             {exceedsCounterpart && (
@@ -491,6 +496,209 @@ const AmountModal = ({ field, test, onClose, onSave, onNetworkError }) => {
 };
 
 // ══════════════════════════════════════════════════════════════════════════════
+// Manual Add Test Modal (test not found in catalog)
+// ══════════════════════════════════════════════════════════════════════════════
+const ManualAddTestModal = ({ initialName, onClose, onAdded, onNetworkError }) => {
+  const [name, setName] = useState(initialName ?? "");
+  const [price, setPrice] = useState("");
+  const [commission, setCommission] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [apiError, setApiError] = useState("");
+
+  const trimmedName = name.trim();
+  const numericPrice = parseFloat(price);
+  const numericCommission = parseFloat(commission);
+  const priceInvalid = price === "" || isNaN(numericPrice) || numericPrice < 0;
+  const commissionInvalid = commission !== "" && (isNaN(numericCommission) || numericCommission < 0);
+  const exceedsPrice = !priceInvalid && !commissionInvalid && (parseFloat(commission) || 0) > numericPrice;
+  const invalid = trimmedName.length === 0 || priceInvalid || commissionInvalid || exceedsPrice;
+
+  const handleSubmit = async () => {
+    if (invalid) return;
+    setSaving(true);
+    setApiError("");
+    try {
+      const res = await testService.addManualTest({
+        name: trimmedName,
+        price: numericPrice,
+        commission: parseFloat(commission) || 0,
+      });
+      onAdded(res.data);
+    } catch (err) {
+      if (isNetworkError(err)) {
+        setApiError("ইন্টারনেট সংযোগ নেই। দয়া করে সংযোগ চেক করুন।");
+        onNetworkError?.();
+      } else if (getErrorStatus(err) === 409) {
+        setApiError("এই নামে টেস্ট ইতিমধ্যে বিদ্যমান।");
+      } else {
+        setApiError(getErrorMessage(err, "টেস্ট যোগ করতে ব্যর্থ।"));
+      }
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Modal isOpen size="sm" onClose={onClose}>
+      <div className="flex flex-col max-h-[calc(100svh-96px)] overflow-hidden">
+        {/* Header */}
+        <div
+          className="shrink-0 px-6 py-5 flex items-center justify-between border-b border-[#0D948820]"
+          style={{ background: "linear-gradient(135deg,#0D948815 0%,#0F766E08 100%)" }}
+        >
+          <div className="flex items-center gap-3.5">
+            <div
+              className="flex items-center justify-center shrink-0 w-11 h-11 rounded-[14px] shadow-[0_8px_20px_#0D948840]"
+              style={{ background: "linear-gradient(135deg,#0D9488,#0F766E)" }}
+            >
+              <Plus className="w-[18px] h-[18px] text-white" />
+            </div>
+            <div>
+              <p className="font-['IBM_Plex_Mono',monospace] text-[10px] font-bold uppercase tracking-[0.1em] mb-[2px] text-[#0D9488]">
+                ম্যানুয়াল টেস্ট
+              </p>
+              <p className="font-['IBM_Plex_Sans',sans-serif] text-base font-bold text-[#0F172A]">
+                নতুন টেস্ট যোগ করুন
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="flex items-center justify-center w-8 h-8 rounded-[10px] text-[#94A3B8] border-[1.5px] border-[#E2E8F0] transition-all hover:bg-[#F1F5F9] hover:text-[#0F172A]"
+          >
+            <X className="w-[15px] h-[15px]" />
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="px-6 py-5 bg-[#F8FAFC] flex-1 min-h-0 overflow-y-auto space-y-3">
+          <div className="bg-white rounded-xl p-4 border border-[#E2E8F0] shadow-[0_2px_8px_rgba(15,23,42,0.04)]">
+            <p className="font-['IBM_Plex_Mono',monospace] text-[9px] font-bold uppercase tracking-[0.1em] text-[#94A3B8] mb-2">
+              টেস্টের নাম
+            </p>
+            <input
+              type="text"
+              autoFocus
+              value={name}
+              onChange={(e) => {
+                setName(e.target.value);
+                if (apiError) setApiError("");
+              }}
+              placeholder="যেমন: S. GPT"
+              className={`${inputBase} px-3 py-2.5 text-sm`}
+              onFocus={focusInput}
+              onBlur={blurInput}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !invalid && !saving) handleSubmit();
+              }}
+            />
+            <p className="mt-2 font-['IBM_Plex_Mono',monospace] text-[10.5px] text-[#94A3B8] leading-relaxed">
+              এই টেস্টটি ক্যাটালগে পাওয়া যায়নি। নাম, মূল্য ও কমিশন দিয়ে যোগ করুন — ফরম্যাট পরে সেট করা যাবে।
+            </p>
+          </div>
+
+          <div className="bg-white rounded-xl p-4 border border-[#E2E8F0] shadow-[0_2px_8px_rgba(15,23,42,0.04)]">
+            <div className="grid grid-cols-2 gap-2.5">
+              <div>
+                <label className="flex items-center gap-1 mb-1.5 font-['IBM_Plex_Mono',monospace] text-[9px] font-bold uppercase tracking-[0.08em] text-[#0D9488]">
+                  <Banknote className="w-3 h-3" /> মূল্য
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 font-['IBM_Plex_Mono',monospace] text-xs font-bold text-[#0D9488]">
+                    ৳
+                  </span>
+                  <input
+                    type="number"
+                    value={price}
+                    onChange={(e) => {
+                      setPrice(e.target.value);
+                      if (apiError) setApiError("");
+                    }}
+                    placeholder="০.০০"
+                    min="0"
+                    className={`${inputBase} pl-7 pr-2 py-2.5 text-sm`}
+                    onFocus={focusInput}
+                    onBlur={blurInput}
+                    onWheel={blockWheelChange}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && !invalid && !saving) handleSubmit();
+                    }}
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="flex items-center gap-1 mb-1.5 font-['IBM_Plex_Mono',monospace] text-[9px] font-bold uppercase tracking-[0.08em] text-[#8B5CF6]">
+                  <Percent className="w-3 h-3" /> কমিশন
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 font-['IBM_Plex_Mono',monospace] text-xs font-bold text-[#8B5CF6]">
+                    ৳
+                  </span>
+                  <input
+                    type="number"
+                    value={commission}
+                    onChange={(e) => {
+                      setCommission(e.target.value);
+                      if (apiError) setApiError("");
+                    }}
+                    placeholder="০.০০"
+                    min="0"
+                    className={`${inputBase} pl-7 pr-2 py-2.5 text-sm ${exceedsPrice ? "!border-[#EF4444]" : ""}`}
+                    onFocus={focusInput}
+                    onBlur={blurInput}
+                    onWheel={blockWheelChange}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && !invalid && !saving) handleSubmit();
+                    }}
+                  />
+                </div>
+              </div>
+            </div>
+            {exceedsPrice && (
+              <p className="mt-2 font-['IBM_Plex_Mono',monospace] text-[10.5px] text-[#EF4444]">
+                কমিশন মূল্যের চেয়ে বেশি হতে পারবে না।
+              </p>
+            )}
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="shrink-0 bg-white border-t border-[#E2E8F0]">
+          {apiError && (
+            <div className="mx-6 mt-4 flex items-start gap-2.5 px-4 py-3 bg-[#EF444408] border-[1.5px] border-[#EF444430] rounded-xl">
+              <AlertTriangle className="w-[14px] h-[14px] text-[#EF4444] shrink-0 mt-[1px]" />
+              <span className="text-xs font-['IBM_Plex_Mono',monospace] text-[#EF4444]">{apiError}</span>
+            </div>
+          )}
+          <div className="px-6 py-4 flex gap-3">
+            <button
+              onClick={onClose}
+              disabled={saving}
+              className="flex-1 py-3 font-semibold transition-all rounded-xl border-[1.5px] border-[#E2E8F0] text-[#64748B] font-['IBM_Plex_Mono',monospace] text-xs hover:bg-[#F1F5F9]"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleSubmit}
+              disabled={saving || invalid}
+              className="flex-1 py-3 flex items-center justify-center gap-2 font-semibold transition-all rounded-xl border-none text-white font-['IBM_Plex_Mono',monospace] text-xs disabled:opacity-60"
+              style={{ background: saving || invalid ? "#94A3B8" : "linear-gradient(135deg,#0D9488,#0F766E)" }}
+            >
+              {saving ? (
+                <span className="animate-spin inline-block w-[14px] h-[14px] rounded-full border-2 border-white/40 border-t-white" />
+              ) : (
+                <Plus className="w-[13px] h-[13px]" />
+              )}
+              যোগ করুন
+            </button>
+          </div>
+        </div>
+      </div>
+    </Modal>
+  );
+};
+
+// ══════════════════════════════════════════════════════════════════════════════
 // Add Test Modal
 // ══════════════════════════════════════════════════════════════════════════════
 const AddTestModal = ({ existingTests, onClose, onSaved, onNetworkError }) => {
@@ -504,6 +712,7 @@ const AddTestModal = ({ existingTests, onClose, onSaved, onNetworkError }) => {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedTests, setSelectedTests] = useState({});
   const [expandedCategories, setExpandedCategories] = useState({});
+  const [manualModal, setManualModal] = useState(false);
 
   useEffect(() => {
     const load = async () => {
@@ -619,275 +828,298 @@ const AddTestModal = ({ existingTests, onClose, onSaved, onNetworkError }) => {
   const selectedCount = Object.keys(selectedTests).length;
 
   return (
-    <Modal isOpen size="lg" onClose={onClose}>
-      <div className="flex flex-col max-h-[calc(100svh-96px)] overflow-hidden">
-        {/* Header */}
-        <div
-          className="shrink-0 px-6 py-5 flex items-center justify-between border-b border-[#0D948820]"
-          style={{ background: "linear-gradient(135deg,#0D948815 0%,#0F766E08 100%)" }}
-        >
-          <div className="flex items-center gap-3.5">
-            <div
-              className="flex items-center justify-center shrink-0 w-11 h-11 rounded-[14px] shadow-[0_8px_20px_#0D948840]"
-              style={{ background: "linear-gradient(135deg,#0D9488,#0F766E)" }}
-            >
-              <Plus className="w-[18px] h-[18px] text-white" />
-            </div>
-            <div>
-              <p className="font-['IBM_Plex_Mono',monospace] text-[10px] font-bold uppercase tracking-[0.1em] mb-[2px] text-[#0D9488]">
-                ক্যাটালগ থেকে যোগ করুন
-              </p>
-              <p className="font-['IBM_Plex_Sans',sans-serif] text-base font-bold text-[#0F172A]">
-                টেস্ট নির্বাচন করুন
-              </p>
-            </div>
-          </div>
-          <button
-            onClick={onClose}
-            className="flex items-center justify-center w-8 h-8 rounded-[10px] text-[#94A3B8] border-[1.5px] border-[#E2E8F0] transition-all hover:bg-[#F1F5F9] hover:text-[#0F172A]"
+    <>
+      {manualModal && (
+        <ManualAddTestModal
+          initialName={searchQuery}
+          onClose={() => setManualModal(false)}
+          onAdded={(newTest) => {
+            setManualModal(false);
+            onSaved([newTest]);
+          }}
+          onNetworkError={onNetworkError}
+        />
+      )}
+      <Modal isOpen size="lg" onClose={onClose}>
+        <div className="flex flex-col max-h-[calc(100svh-96px)] overflow-hidden">
+          {/* Header */}
+          <div
+            className="shrink-0 px-6 py-5 flex items-center justify-between border-b border-[#0D948820]"
+            style={{ background: "linear-gradient(135deg,#0D948815 0%,#0F766E08 100%)" }}
           >
-            <X className="w-[15px] h-[15px]" />
-          </button>
-        </div>
-
-        {/* Search */}
-        <div className="shrink-0 px-5 pt-4 pb-3 bg-[#F8FAFC] border-b border-[#E2E8F0]">
-          <div className="relative">
-            <Search className="w-[13px] h-[13px] text-[#94A3B8] absolute left-[11px] top-1/2 -translate-y-1/2 pointer-events-none" />
-            <input
-              type="text"
-              placeholder="টেস্টের নাম খুঁজুন…"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className={`${inputBase} pl-8 ${searchQuery ? "pr-8" : "pr-3"} py-2 text-xs`}
-              onFocus={focusInput}
-              onBlur={blurInput}
-            />
-            {searchQuery && (
-              <button
-                onClick={() => setSearchQuery("")}
-                className="absolute right-[10px] top-1/2 -translate-y-1/2 text-[#94A3B8]"
+            <div className="flex items-center gap-3.5">
+              <div
+                className="flex items-center justify-center shrink-0 w-11 h-11 rounded-[14px] shadow-[0_8px_20px_#0D948840]"
+                style={{ background: "linear-gradient(135deg,#0D9488,#0F766E)" }}
               >
-                <X className="w-[13px] h-[13px]" />
-              </button>
-            )}
+                <Plus className="w-[18px] h-[18px] text-white" />
+              </div>
+              <div>
+                <p className="font-['IBM_Plex_Mono',monospace] text-[10px] font-bold uppercase tracking-[0.1em] mb-[2px] text-[#0D9488]">
+                  ক্যাটালগ থেকে যোগ করুন
+                </p>
+                <p className="font-['IBM_Plex_Sans',sans-serif] text-base font-bold text-[#0F172A]">
+                  টেস্ট নির্বাচন করুন
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={onClose}
+              className="flex items-center justify-center w-8 h-8 rounded-[10px] text-[#94A3B8] border-[1.5px] border-[#E2E8F0] transition-all hover:bg-[#F1F5F9] hover:text-[#0F172A]"
+            >
+              <X className="w-[15px] h-[15px]" />
+            </button>
           </div>
-        </div>
 
-        {/* Body */}
-        <div className="flex-1 min-h-0 overflow-y-auto">
-          {initialLoading ? (
-            <div className="p-6 space-y-3">
-              {[1, 2, 3].map((i) => (
-                <div key={i} className="animate-pulse flex items-center gap-3 px-2 py-3 border-b border-[#E2E8F0]">
-                  <div className="w-5 h-5 rounded bg-[#E2E8F0]" />
-                  <div className="flex-1 h-3 bg-[#E2E8F0] rounded" />
-                </div>
-              ))}
+          {/* Search */}
+          <div className="shrink-0 px-5 pt-4 pb-3 bg-[#F8FAFC] border-b border-[#E2E8F0]">
+            <div className="relative">
+              <Search className="w-[13px] h-[13px] text-[#94A3B8] absolute left-[11px] top-1/2 -translate-y-1/2 pointer-events-none" />
+              <input
+                type="text"
+                placeholder="টেস্টের নাম খুঁজুন…"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className={`${inputBase} pl-8 ${searchQuery ? "pr-8" : "pr-3"} py-2 text-xs`}
+                onFocus={focusInput}
+                onBlur={blurInput}
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery("")}
+                  className="absolute right-[10px] top-1/2 -translate-y-1/2 text-[#94A3B8]"
+                >
+                  <X className="w-[13px] h-[13px]" />
+                </button>
+              )}
             </div>
-          ) : loadError ? (
-            <div className="flex flex-col items-center justify-center py-10 gap-2 text-[#94A3B8]">
-              <AlertCircle className="w-7 h-7 opacity-40" />
-              <p className="font-['IBM_Plex_Mono',monospace] text-xs text-[#EF4444]">{loadError}</p>
-            </div>
-          ) : Object.keys(groupedTests).length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-10 gap-2 text-[#94A3B8]">
-              <FlaskConical className="w-7 h-7 opacity-40" />
-              <p className="font-['IBM_Plex_Mono',monospace] text-xs">কোনো টেস্ট পাওয়া যায়নি</p>
-            </div>
-          ) : (
-            <div className="px-4 py-3 space-y-1">
-              {Object.entries(groupedTests).map(([catKey, { name: catName, tests: catTests }]) => (
-                <div key={catKey}>
-                  {/* Category header */}
-                  <button
-                    onClick={() => toggleCategory(catKey)}
-                    className="w-full flex items-center gap-2 py-2 px-1 group"
-                  >
-                    <span className="font-['IBM_Plex_Mono',monospace] text-[9px] font-bold uppercase tracking-[0.1em] text-[#0D9488]">
-                      {catName}
-                    </span>
-                    <span
-                      className="font-['IBM_Plex_Mono',monospace] text-[10px] font-bold px-1.5 py-px rounded-[5px] text-[#0D9488]"
-                      style={{ background: "#0D948812", border: "1px solid #0D948825" }}
+          </div>
+
+          {/* Body */}
+          <div className="flex-1 min-h-0 overflow-y-auto">
+            {initialLoading ? (
+              <div className="p-6 space-y-3">
+                {[1, 2, 3].map((i) => (
+                  <div key={i} className="animate-pulse flex items-center gap-3 px-2 py-3 border-b border-[#E2E8F0]">
+                    <div className="w-5 h-5 rounded bg-[#E2E8F0]" />
+                    <div className="flex-1 h-3 bg-[#E2E8F0] rounded" />
+                  </div>
+                ))}
+              </div>
+            ) : loadError ? (
+              <div className="flex flex-col items-center justify-center py-10 gap-2 text-[#94A3B8]">
+                <AlertCircle className="w-7 h-7 opacity-40" />
+                <p className="font-['IBM_Plex_Mono',monospace] text-xs text-[#EF4444]">{loadError}</p>
+              </div>
+            ) : Object.keys(groupedTests).length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-10 gap-3 text-[#94A3B8]">
+                <FlaskConical className="w-7 h-7 opacity-40" />
+                <p className="font-['IBM_Plex_Mono',monospace] text-xs">কোনো টেস্ট পাওয়া যায়নি</p>
+                <button
+                  onClick={() => setManualModal(true)}
+                  className="flex items-center gap-1.5 transition-all font-semibold px-4 py-2 rounded-xl text-white font-['IBM_Plex_Mono',monospace] text-xs border-none shadow-[0_4px_14px_rgba(13,148,136,0.4)] hover:shadow-[0_6px_20px_rgba(13,148,136,0.5)]"
+                  style={{ background: "linear-gradient(135deg,#0D9488,#0F766E)" }}
+                >
+                  <Plus className="w-[13px] h-[13px]" />
+                  {searchQuery.trim() ? `"${searchQuery.trim()}" নামে নতুন টেস্ট যোগ করুন` : "নতুন টেস্ট যোগ করুন"}
+                </button>
+              </div>
+            ) : (
+              <div className="px-4 py-3 space-y-1">
+                {Object.entries(groupedTests).map(([catKey, { name: catName, tests: catTests }]) => (
+                  <div key={catKey}>
+                    {/* Category header */}
+                    <button
+                      onClick={() => toggleCategory(catKey)}
+                      className="w-full flex items-center gap-2 py-2 px-1 group"
                     >
-                      {catTests.length}
-                    </span>
-                    <div className="flex-1 h-px bg-[#0D948820]" />
-                    {expandedCategories[catKey] ? (
-                      <ChevronDown className="w-3 h-3 text-[#94A3B8]" />
-                    ) : (
-                      <ChevronRight className="w-3 h-3 text-[#94A3B8]" />
-                    )}
-                  </button>
+                      <span className="font-['IBM_Plex_Mono',monospace] text-[9px] font-bold uppercase tracking-[0.1em] text-[#0D9488]">
+                        {catName}
+                      </span>
+                      <span
+                        className="font-['IBM_Plex_Mono',monospace] text-[10px] font-bold px-1.5 py-px rounded-[5px] text-[#0D9488]"
+                        style={{ background: "#0D948812", border: "1px solid #0D948825" }}
+                      >
+                        {catTests.length}
+                      </span>
+                      <div className="flex-1 h-px bg-[#0D948820]" />
+                      {expandedCategories[catKey] ? (
+                        <ChevronDown className="w-3 h-3 text-[#94A3B8]" />
+                      ) : (
+                        <ChevronRight className="w-3 h-3 text-[#94A3B8]" />
+                      )}
+                    </button>
 
-                  {expandedCategories[catKey] &&
-                    catTests.map((test, index) => {
-                      const testKey = test._id;
-                      const isAlreadyAdded = existingTestIds.has(testKey);
-                      const isSelected = !!selectedTests[testKey];
+                    {expandedCategories[catKey] &&
+                      catTests.map((test, index) => {
+                        const testKey = test._id;
+                        const isAlreadyAdded = existingTestIds.has(testKey);
+                        const isSelected = !!selectedTests[testKey];
 
-                      return (
-                        <div
-                          key={testKey || `test-${catKey}-${index}`}
-                          onClick={() => !isAlreadyAdded && toggleSelect(testKey)}
-                          className={`flex items-start gap-3 px-2 py-2.5 rounded-xl transition-all mb-0.5
-                          ${isAlreadyAdded ? "opacity-50 cursor-not-allowed" : isSelected ? "bg-[#0D948808] cursor-pointer" : "hover:bg-[#F1F5F9] cursor-pointer"}`}
-                        >
-                          {/* Checkbox */}
-                          <div className="shrink-0 mt-0.5">
-                            {isAlreadyAdded ? (
-                              <div className="w-5 h-5 rounded-full bg-[#10B98120] border-2 border-[#10B981] flex items-center justify-center">
-                                <CheckCircle2 className="w-3 h-3 text-[#10B981]" />
-                              </div>
-                            ) : (
-                              <span
-                                className="flex items-center justify-center w-5 h-5 rounded-[5px] border-[1.5px] transition-all"
-                                style={{
-                                  background: isSelected ? C.teal : undefined,
-                                  borderColor: isSelected ? C.teal : "#CBD5E1",
-                                }}
-                              >
-                                {isSelected && <Check className="w-[9px] h-[9px] text-white" />}
-                              </span>
-                            )}
-                          </div>
-
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 pt-0.5">
-                              <span className="font-['IBM_Plex_Sans',sans-serif] text-sm font-semibold text-[#0F172A]">
-                                {test.name}
-                              </span>
-                              {test.isOnline ? (
-                                <span
-                                  className="inline-flex items-center gap-1 font-['IBM_Plex_Mono',monospace] text-[9px] font-bold text-white rounded-[6px] px-1.5 py-px shrink-0 shadow-[0_2px_5px_#10B98130]"
-                                  style={{ background: "linear-gradient(135deg,#10B981,#059669)" }}
-                                >
-                                  <Wifi className="w-2.5 h-2.5" /> অনলাইন
-                                </span>
+                        return (
+                          <div
+                            key={testKey || `test-${catKey}-${index}`}
+                            onClick={() => !isAlreadyAdded && toggleSelect(testKey)}
+                            className={`flex items-start gap-3 px-2 py-2.5 rounded-xl transition-all mb-0.5
+                            ${isAlreadyAdded ? "opacity-50 cursor-not-allowed" : isSelected ? "bg-[#0D948808] cursor-pointer" : "hover:bg-[#F1F5F9] cursor-pointer"}`}
+                          >
+                            {/* Checkbox */}
+                            <div className="shrink-0 mt-0.5">
+                              {isAlreadyAdded ? (
+                                <div className="w-5 h-5 rounded-full bg-[#10B98120] border-2 border-[#10B981] flex items-center justify-center">
+                                  <CheckCircle2 className="w-3 h-3 text-[#10B981]" />
+                                </div>
                               ) : (
-                                <span className="inline-flex items-center gap-1 font-['IBM_Plex_Mono',monospace] text-[9px] font-bold text-[#94A3B8] bg-[#F1F5F9] border border-[#E2E8F0] rounded-[6px] px-1.5 py-px shrink-0">
-                                  <WifiOff className="w-2.5 h-2.5" /> অফলাইন
-                                </span>
-                              )}
-                              {isAlreadyAdded && (
-                                <span className="font-['IBM_Plex_Mono',monospace] text-[10px] font-bold text-[#10B981] bg-[#10B98110] border border-[#10B98125] rounded-[6px] px-1.5 py-px shrink-0">
-                                  যোগ করা আছে
+                                <span
+                                  className="flex items-center justify-center w-5 h-5 rounded-[5px] border-[1.5px] transition-all"
+                                  style={{
+                                    background: isSelected ? C.teal : undefined,
+                                    borderColor: isSelected ? C.teal : "#CBD5E1",
+                                  }}
+                                >
+                                  {isSelected && <Check className="w-[9px] h-[9px] text-white" />}
                                 </span>
                               )}
                             </div>
 
-                            {isSelected && !isAlreadyAdded && (
-                              <div
-                                className="mt-2.5 grid grid-cols-2 gap-2.5 p-3 rounded-xl border-[1.5px] border-[#E2E8F0] bg-[#F8FAFC]"
-                                onClick={(e) => e.stopPropagation()}
-                              >
-                                <div>
-                                  <label className="flex items-center gap-1 mb-1.5 font-['IBM_Plex_Mono',monospace] text-[9px] font-bold uppercase tracking-[0.08em] text-[#0D9488]">
-                                    <Banknote className="w-3 h-3" /> মূল্য
-                                  </label>
-                                  <div className="relative">
-                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 font-['IBM_Plex_Mono',monospace] text-xs font-bold text-[#0D9488]">
-                                      ৳
-                                    </span>
-                                    <input
-                                      type="number"
-                                      value={selectedTests[testKey]?.price ?? ""}
-                                      onChange={(e) => updateField(testKey, "price", e.target.value)}
-                                      placeholder="০.০০"
-                                      min="0"
-                                      className={`${inputBase} pl-7 pr-2 py-2 text-xs bg-white`}
-                                      onFocus={focusInput}
-                                      onBlur={blurInput}
-                                    />
-                                  </div>
-                                </div>
-                                <div>
-                                  <label className="flex items-center gap-1 mb-1.5 font-['IBM_Plex_Mono',monospace] text-[9px] font-bold uppercase tracking-[0.08em] text-[#8B5CF6]">
-                                    <Percent className="w-3 h-3" /> কমিশন
-                                  </label>
-                                  <div className="relative">
-                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 font-['IBM_Plex_Mono',monospace] text-xs font-bold text-[#8B5CF6]">
-                                      ৳
-                                    </span>
-                                    <input
-                                      type="number"
-                                      value={selectedTests[testKey]?.commission ?? ""}
-                                      onChange={(e) => updateField(testKey, "commission", e.target.value)}
-                                      placeholder="০.০০"
-                                      min="0"
-                                      className={`${inputBase} pl-7 pr-2 py-2 text-xs bg-white ${
-                                        (parseFloat(selectedTests[testKey]?.commission) || 0) >
-                                        (parseFloat(selectedTests[testKey]?.price) || 0)
-                                          ? "!border-[#EF4444]"
-                                          : ""
-                                      }`}
-                                      onFocus={focusInput}
-                                      onBlur={blurInput}
-                                    />
-                                  </div>
-                                  {(parseFloat(selectedTests[testKey]?.commission) || 0) >
-                                    (parseFloat(selectedTests[testKey]?.price) || 0) && (
-                                    <p className="mt-1 font-['IBM_Plex_Mono',monospace] text-[10px] text-[#EF4444]">
-                                      মূল্যের চেয়ে বেশি হতে পারবে না
-                                    </p>
-                                  )}
-                                </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 pt-0.5">
+                                <span className="font-['IBM_Plex_Sans',sans-serif] text-sm font-semibold text-[#0F172A]">
+                                  {test.name}
+                                </span>
+                                {test.isOnline ? (
+                                  <span
+                                    className="inline-flex items-center gap-1 font-['IBM_Plex_Mono',monospace] text-[9px] font-bold text-white rounded-[6px] px-1.5 py-px shrink-0 shadow-[0_2px_5px_#10B98130]"
+                                    style={{ background: "linear-gradient(135deg,#10B981,#059669)" }}
+                                  >
+                                    <Wifi className="w-2.5 h-2.5" /> অনলাইন
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center gap-1 font-['IBM_Plex_Mono',monospace] text-[9px] font-bold text-[#94A3B8] bg-[#F1F5F9] border border-[#E2E8F0] rounded-[6px] px-1.5 py-px shrink-0">
+                                    <WifiOff className="w-2.5 h-2.5" /> অফলাইন
+                                  </span>
+                                )}
+                                {isAlreadyAdded && (
+                                  <span className="font-['IBM_Plex_Mono',monospace] text-[10px] font-bold text-[#10B981] bg-[#10B98110] border border-[#10B98125] rounded-[6px] px-1.5 py-px shrink-0">
+                                    যোগ করা আছে
+                                  </span>
+                                )}
                               </div>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
 
-        {/* Footer */}
-        <div className="shrink-0 bg-white border-t border-[#E2E8F0]">
-          {apiError && (
-            <div className="mx-6 mt-4 flex items-start gap-2.5 px-4 py-3 bg-[#EF444408] border-[1.5px] border-[#EF444430] rounded-xl">
-              <AlertTriangle className="w-[14px] h-[14px] text-[#EF4444] shrink-0 mt-[1px]" />
-              <span className="text-xs font-['IBM_Plex_Mono',monospace] text-[#EF4444]">{apiError}</span>
-            </div>
-          )}
-          <div className="px-6 py-4 flex items-center justify-between gap-3">
-            <span className="font-['IBM_Plex_Mono',monospace] text-xs text-[#64748B]">
-              {selectedCount > 0 ? `${selectedCount}টি নির্বাচিত` : "কোনোটি নির্বাচিত নয়"}
-            </span>
-            <div className="flex gap-3">
-              <button
-                type="button"
-                onClick={onClose}
-                disabled={saving}
-                className="py-2.5 px-5 font-semibold transition-all rounded-xl border-[1.5px] border-[#E2E8F0] text-[#64748B] font-['IBM_Plex_Mono',monospace] text-xs hover:bg-[#F1F5F9]"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleSave}
-                disabled={saving || selectedCount === 0}
-                className="py-2.5 px-5 flex items-center justify-center gap-2 font-semibold transition-all rounded-xl border-none text-white font-['IBM_Plex_Mono',monospace] text-xs"
-                style={{
-                  background: saving || selectedCount === 0 ? C.muted : "linear-gradient(135deg,#0D9488,#0F766E)",
-                  cursor: saving || selectedCount === 0 ? "not-allowed" : "pointer",
-                  boxShadow: saving || selectedCount === 0 ? "none" : "0 4px 14px rgba(13,148,136,0.4)",
-                }}
-              >
-                {saving ? (
-                  <span className="animate-spin inline-block w-[14px] h-[14px] rounded-full border-2 border-white/40 border-t-white" />
-                ) : (
-                  <Plus className="w-[13px] h-[13px]" />
-                )}
-                {selectedCount > 0 ? `${selectedCount}টি টেস্ট যোগ করুন` : "যোগ করুন"}
-              </button>
+                              {isSelected && !isAlreadyAdded && (
+                                <div
+                                  className="mt-2.5 grid grid-cols-2 gap-2.5 p-3 rounded-xl border-[1.5px] border-[#E2E8F0] bg-[#F8FAFC]"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  <div>
+                                    <label className="flex items-center gap-1 mb-1.5 font-['IBM_Plex_Mono',monospace] text-[9px] font-bold uppercase tracking-[0.08em] text-[#0D9488]">
+                                      <Banknote className="w-3 h-3" /> মূল্য
+                                    </label>
+                                    <div className="relative">
+                                      <span className="absolute left-3 top-1/2 -translate-y-1/2 font-['IBM_Plex_Mono',monospace] text-xs font-bold text-[#0D9488]">
+                                        ৳
+                                      </span>
+                                      <input
+                                        type="number"
+                                        value={selectedTests[testKey]?.price ?? ""}
+                                        onChange={(e) => updateField(testKey, "price", e.target.value)}
+                                        placeholder="০.০০"
+                                        min="0"
+                                        className={`${inputBase} pl-7 pr-2 py-2 text-xs bg-white`}
+                                        onFocus={focusInput}
+                                        onBlur={blurInput}
+                                        onWheel={blockWheelChange}
+                                      />
+                                    </div>
+                                  </div>
+                                  <div>
+                                    <label className="flex items-center gap-1 mb-1.5 font-['IBM_Plex_Mono',monospace] text-[9px] font-bold uppercase tracking-[0.08em] text-[#8B5CF6]">
+                                      <Percent className="w-3 h-3" /> কমিশন
+                                    </label>
+                                    <div className="relative">
+                                      <span className="absolute left-3 top-1/2 -translate-y-1/2 font-['IBM_Plex_Mono',monospace] text-xs font-bold text-[#8B5CF6]">
+                                        ৳
+                                      </span>
+                                      <input
+                                        type="number"
+                                        value={selectedTests[testKey]?.commission ?? ""}
+                                        onChange={(e) => updateField(testKey, "commission", e.target.value)}
+                                        placeholder="০.০০"
+                                        min="0"
+                                        className={`${inputBase} pl-7 pr-2 py-2 text-xs bg-white ${
+                                          (parseFloat(selectedTests[testKey]?.commission) || 0) >
+                                          (parseFloat(selectedTests[testKey]?.price) || 0)
+                                            ? "!border-[#EF4444]"
+                                            : ""
+                                        }`}
+                                        onFocus={focusInput}
+                                        onBlur={blurInput}
+                                        onWheel={blockWheelChange}
+                                      />
+                                    </div>
+                                    {(parseFloat(selectedTests[testKey]?.commission) || 0) >
+                                      (parseFloat(selectedTests[testKey]?.price) || 0) && (
+                                      <p className="mt-1 font-['IBM_Plex_Mono',monospace] text-[10px] text-[#EF4444]">
+                                        মূল্যের চেয়ে বেশি হতে পারবে না
+                                      </p>
+                                    )}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Footer */}
+          <div className="shrink-0 bg-white border-t border-[#E2E8F0]">
+            {apiError && (
+              <div className="mx-6 mt-4 flex items-start gap-2.5 px-4 py-3 bg-[#EF444408] border-[1.5px] border-[#EF444430] rounded-xl">
+                <AlertTriangle className="w-[14px] h-[14px] text-[#EF4444] shrink-0 mt-[1px]" />
+                <span className="text-xs font-['IBM_Plex_Mono',monospace] text-[#EF4444]">{apiError}</span>
+              </div>
+            )}
+            <div className="px-6 py-4 flex items-center justify-between gap-3">
+              <span className="font-['IBM_Plex_Mono',monospace] text-xs text-[#64748B]">
+                {selectedCount > 0 ? `${selectedCount}টি নির্বাচিত` : "কোনোটি নির্বাচিত নয়"}
+              </span>
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={onClose}
+                  disabled={saving}
+                  className="py-2.5 px-5 font-semibold transition-all rounded-xl border-[1.5px] border-[#E2E8F0] text-[#64748B] font-['IBM_Plex_Mono',monospace] text-xs hover:bg-[#F1F5F9]"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSave}
+                  disabled={saving || selectedCount === 0}
+                  className="py-2.5 px-5 flex items-center justify-center gap-2 font-semibold transition-all rounded-xl border-none text-white font-['IBM_Plex_Mono',monospace] text-xs"
+                  style={{
+                    background: saving || selectedCount === 0 ? C.muted : "linear-gradient(135deg,#0D9488,#0F766E)",
+                    cursor: saving || selectedCount === 0 ? "not-allowed" : "pointer",
+                    boxShadow: saving || selectedCount === 0 ? "none" : "0 4px 14px rgba(13,148,136,0.4)",
+                  }}
+                >
+                  {saving ? (
+                    <span className="animate-spin inline-block w-[14px] h-[14px] rounded-full border-2 border-white/40 border-t-white" />
+                  ) : (
+                    <Plus className="w-[13px] h-[13px]" />
+                  )}
+                  {selectedCount > 0 ? `${selectedCount}টি টেস্ট যোগ করুন` : "যোগ করুন"}
+                </button>
+              </div>
             </div>
           </div>
         </div>
-      </div>
-    </Modal>
+      </Modal>
+    </>
   );
 };
 

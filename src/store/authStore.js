@@ -142,19 +142,6 @@ export const useAuthStore = create(
     }),
     {
       name: "labpilot-auth",
-      // Only `lab` is persisted — full object except `_id` (internal Mongo
-      // id, no use to the frontend) — so screens like Home.jsx have
-      // everything they need right after reload, before /refresh resolves,
-      // without the backend needing an extra DB lookup just to hand it back.
-      // `user` (permissions, role, labKey, labId, maxLabAdjustment) and
-      // `token` are deliberately kept out of localStorage:
-      //   - `token`: an access token readable by any injected script (XSS,
-      //     malicious extension, a compromised dependency) is a real risk.
-      //   - `isAuthenticated`: excluded so a stale "true" can't flash
-      //     protected UI before initialize() confirms the session is valid.
-      //   - `user`: this is a hospital/diagnostic SaaS, so permission maps
-      //     stay out of storage too — initialize() re-derives the full
-      //     `user` from the server on every mount anyway.
       partialize: (state) => {
         if (!state.lab) return { lab: null };
         const { _id, ...labWithoutId } = state.lab;
