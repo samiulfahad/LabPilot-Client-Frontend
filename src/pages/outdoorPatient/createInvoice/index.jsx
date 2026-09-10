@@ -659,6 +659,18 @@ const InvoiceForm = ({
   const doctorOptionRefs = useRef([]);
   const itemOptionRefs = useRef([]);
 
+  // Guards against the onBlur "free-text fallback" firing right after a
+  // keyboard (Enter) selection. Selecting via Enter calls focusNextField(),
+  // which synchronously blurs the still-focused doctor/referrer input
+  // *before* React flushes the selection's setState calls — so onBlur was
+  // seeing stale state (doctor/referredBy still null) and immediately
+  // overwriting the freshly selected object with a plain string. Setting
+  // this ref the instant a selection happens tells onBlur to skip that
+  // fallback for this one blur. Mouse selection never hits this path
+  // because onMouseDown already calls preventDefault(), suppressing blur.
+  const skipDoctorBlurRef = useRef(false);
+  const skipReferrerBlurRef = useRef(false);
+
   // ── "Enter moves to next field" chain ──────────────────────────────────
   // fieldRefs holds the live DOM node for every field that participates in
   // FIELD_ORDER. Fields that aren't currently rendered (e.g. the referrer
@@ -760,6 +772,7 @@ const InvoiceForm = ({
   };
 
   const selectReferrer = (r) => {
+    skipReferrerBlurRef.current = true;
     onChange("referredBy", r);
     setShowReferrerDrop(false);
     setReferrerQuery("");
@@ -767,6 +780,7 @@ const InvoiceForm = ({
   };
 
   const selectDoctor = (d) => {
+    skipDoctorBlurRef.current = true;
     onChange("doctor", d);
     setShowDoctorDrop(false);
     setDoctorQuery("");
@@ -990,8 +1004,15 @@ const InvoiceForm = ({
                       })
                     }
                     onBlur={() => {
-                      if (doctorQuery.trim() && (doctor === null || typeof doctor === "string"))
+                      if (skipDoctorBlurRef.current) {
+                        // A keyboard (Enter) selection just happened and is
+                        // about to move focus elsewhere. Don't let this
+                        // blur's stale closure re-run the free-text
+                        // fallback and clobber the object we just selected.
+                        skipDoctorBlurRef.current = false;
+                      } else if (doctorQuery.trim() && (doctor === null || typeof doctor === "string")) {
                         onChange("doctor", doctorQuery.trim());
+                      }
                       setShowDoctorDrop(false);
                     }}
                     className="w-full pl-9 pr-9 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
@@ -1102,8 +1123,13 @@ const InvoiceForm = ({
                       })
                     }
                     onBlur={() => {
-                      if (referrerQuery.trim() && (referredBy === null || typeof referredBy === "string"))
+                      if (skipReferrerBlurRef.current) {
+                        // Same stale-closure race as the doctor field —
+                        // see the comment on skipDoctorBlurRef above.
+                        skipReferrerBlurRef.current = false;
+                      } else if (referrerQuery.trim() && (referredBy === null || typeof referredBy === "string")) {
                         onChange("referredBy", referrerQuery.trim());
+                      }
                       setShowReferrerDrop(false);
                     }}
                     className={`w-full pl-9 pr-9 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 ${useDoctorAsReferrer ? "bg-gray-50 text-gray-400 cursor-not-allowed" : ""}`}
