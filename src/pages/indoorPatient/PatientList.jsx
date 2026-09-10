@@ -3,7 +3,7 @@ import { useState, useEffect, useRef } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import indoorPatientService from "../../api/indoorPatient";
-import { Btn, EmptyState, Input, PageHeader, Sk } from "./indoorPatientHelpers";
+import { Btn, EmptyState, Input, PageHeader, Sk, fmt } from "./indoorPatientHelpers";
 import Popup from "../../components/popup";
 import { useAuthStore } from "../../store/authStore";
 
@@ -96,7 +96,7 @@ const PatientRow = ({ patient }) => {
           <CopyIdButton value={patient.admissionId} />
         </div>
         <div className="text-xs text-slate-400 pl-4">
-          {patient.patient?.age} বছর ·{" "}
+          {fmt.age(patient.patient?.age)} ·{" "}
           {patient.patient?.gender === "male" ? "পুরুষ" : patient.patient?.gender === "female" ? "মহিলা" : "অন্যান্য"} ·{" "}
           {patient.patient?.contactNumber}
         </div>

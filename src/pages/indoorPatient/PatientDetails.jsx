@@ -307,7 +307,7 @@ const PatientDetails = () => {
       const p = res.data.patient;
       setEditForm({
         name: p.name,
-        age: p.age,
+        age: { years: p.age?.years ?? 0, months: p.age?.months ?? 0, days: p.age?.days ?? 0 },
         gender: p.gender,
         bloodGroup: p.bloodGroup ?? "",
         contactNumber: p.contactNumber,
@@ -342,6 +342,7 @@ const PatientDetails = () => {
   }, [patientId]);
 
   const setEF = (k, v) => setEditForm((f) => ({ ...f, [k]: v }));
+  const setEFAge = (k, v) => setEditForm((f) => ({ ...f, age: { ...f.age, [k]: Math.max(0, parseInt(v) || 0) } }));
   const setTX = (k, v) => setTxForm((f) => ({ ...f, [k]: v }));
   const setCF = (k, v) => setClinicalForm((f) => ({ ...f, [k]: v }));
 
@@ -354,7 +355,11 @@ const PatientDetails = () => {
       await indoorPatientService.updateInfo(patientId, {
         patient: {
           name: editForm.name.trim(),
-          age: parseInt(editForm.age),
+          age: {
+            years: editForm.age?.years ?? 0,
+            months: editForm.age?.months ?? 0,
+            days: editForm.age?.days ?? 0,
+          },
           gender: editForm.gender,
           bloodGroup: editForm.bloodGroup || undefined,
           contactNumber: editForm.contactNumber.trim(),
@@ -559,7 +564,7 @@ const PatientDetails = () => {
         <span>{patient.patient.name}</span>
         <span className="text-slate-300">·</span>
         <span>
-          {patient.patient.age}y / {patient.patient.gender}
+          {fmt.age(patient.patient.age)} / {patient.patient.gender}
         </span>
       </div>
     </div>
@@ -608,7 +613,7 @@ const PatientDetails = () => {
         <div className="no-print">
           <PageHeader
             title={patient.patient.name}
-            subtitle={`${patient.admissionId} · ${patient.patient.age}y · ${patient.patient.gender}${patient.patient.bloodGroup ? ` · ${patient.patient.bloodGroup}` : ""}`}
+            subtitle={`${patient.admissionId} · ${fmt.age(patient.patient.age)} · ${patient.patient.gender}${patient.patient.bloodGroup ? ` · ${patient.patient.bloodGroup}` : ""}`}
             back={() => navigate(-1)}
           />
         </div>
@@ -666,7 +671,7 @@ const PatientDetails = () => {
                   <div className="grid grid-cols-2 gap-y-3 gap-x-6 text-sm">
                     {[
                       ["Name", patient.patient.name],
-                      ["Age / Gender", `${patient.patient.age}y / ${patient.patient.gender}`],
+                      ["Age / Gender", `${fmt.age(patient.patient.age)} / ${patient.patient.gender}`],
                       ["Blood Group", patient.patient.bloodGroup ?? "—"],
                       ["Contact", patient.patient.contactNumber, true],
                       ["Address", patient.patient.address || "—"],
@@ -699,7 +704,31 @@ const PatientDetails = () => {
                       <Input value={editForm.name} onChange={(e) => setEF("name", e.target.value)} />
                     </Field>
                     <Field label="Age">
-                      <Input type="number" value={editForm.age} onChange={(e) => setEF("age", e.target.value)} />
+                      <div className="grid grid-cols-3 gap-1.5">
+                        <Input
+                          type="number"
+                          min="0"
+                          placeholder="Years"
+                          value={editForm.age?.years ?? 0}
+                          onChange={(e) => setEFAge("years", e.target.value)}
+                        />
+                        <Input
+                          type="number"
+                          min="0"
+                          max="11"
+                          placeholder="Months"
+                          value={editForm.age?.months ?? 0}
+                          onChange={(e) => setEFAge("months", e.target.value)}
+                        />
+                        <Input
+                          type="number"
+                          min="0"
+                          max="30"
+                          placeholder="Days"
+                          value={editForm.age?.days ?? 0}
+                          onChange={(e) => setEFAge("days", e.target.value)}
+                        />
+                      </div>
                     </Field>
                     <Field label="Gender">
                       <Select value={editForm.gender} onChange={(e) => setEF("gender", e.target.value)}>
@@ -1043,7 +1072,8 @@ const PatientDetails = () => {
                 {lab?.contact?.address && <p className="text-xs text-slate-500 mt-1">{lab.contact.address}</p>}
                 {lab?.contact?.primary && <p className="text-xs text-slate-500 mt-0.5">{lab.contact.primary}</p>}
                 <p className="text-xs text-slate-400 mt-2 font-mono">
-                  {patient.admissionId} · {patient.patient.name} · {patient.patient.age}y / {patient.patient.gender}
+                  {patient.admissionId} · {patient.patient.name} · {fmt.age(patient.patient.age)} /{" "}
+                  {patient.patient.gender}
                 </p>
               </div>
 

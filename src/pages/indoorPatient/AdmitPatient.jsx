@@ -34,11 +34,47 @@ const getErrorMessage = (err, fallback) => {
 // ── Network error helper ──────────────────────────────────────────────────
 const isNetworkError = (error) => error?.isAxiosError === true && !error.response;
 
+// ── Age helpers ──────────────────────────────────────────────────────────────
+// Age is collected as three parts (years / months / days) and combined into
+// a single compact string for display, and into a normalized object for the
+// payload sent to the backend — e.g. { years: 24, months: 5, days: 10 }.
+// Any part left blank/invalid is treated as 0; if every part is blank the
+// result is "" (used to gate the "বয়স প্রয়োজন" validation).
+const parseAgePart = (v) => {
+  if (v === "" || v === null || v === undefined) return 0;
+  const n = parseInt(v, 10);
+  return Number.isFinite(n) && n >= 0 ? n : 0;
+};
+
+const normalizeAge = (age) => ({
+  years: parseAgePart(age?.years),
+  months: parseAgePart(age?.months),
+  days: parseAgePart(age?.days),
+});
+
+const formatAge = (age) => {
+  if (!age) return "";
+  const { years, months, days } = normalizeAge(age);
+  const parts = [];
+  if (years > 0) parts.push(`${years} বছর`);
+  if (months > 0) parts.push(`${months} মাস`);
+  if (days > 0) parts.push(`${days} দিন`);
+  if (parts.length === 0) {
+    return age?.years === "" || age?.years === undefined ? "" : "0 বছর";
+  }
+  return parts.join(" ");
+};
+
+// Valid if ANY of the three parts has been typed into — matches the same
+// "at least one part filled" rule used for invoices.
+const isAgeFilled = (age) =>
+  [age?.years, age?.months, age?.days].some((v) => v !== "" && v !== null && v !== undefined);
+
 // ─── Constants ───────────────────────────────────────────────────────────────
 
 const DEFAULTS = {
   name: "",
-  age: "",
+  age: { years: "", months: "", days: "" },
   gender: "male",
   bloodGroup: "",
   contactNumber: "",
@@ -81,6 +117,48 @@ const IconInput = ({ icon: Icon, className = "", ...props }) => (
     />
   </div>
 );
+
+const AgePartInput = ({ value, onChange, max, placeholder }) => (
+  <input
+    type="number"
+    inputMode="numeric"
+    value={value}
+    onChange={(e) => onChange(e.target.value)}
+    min="0"
+    max={max}
+    placeholder={placeholder}
+    className="w-full text-center py-2.5 px-2 border border-slate-300 rounded-lg text-sm font-noto
+      focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+  />
+);
+
+const AgeInputGroup = ({ age, onAgeChange }) => {
+  const preview = formatAge(age);
+  return (
+    <div>
+      <div className="grid grid-cols-3 gap-2">
+        <div>
+          <AgePartInput value={age.years} onChange={(v) => onAgeChange("years", v)} max={150} placeholder="বছর" />
+          <p className="text-[10px] text-slate-400 text-center mt-1">বছর</p>
+        </div>
+        <div>
+          <AgePartInput value={age.months} onChange={(v) => onAgeChange("months", v)} max={11} placeholder="মাস" />
+          <p className="text-[10px] text-slate-400 text-center mt-1">মাস</p>
+        </div>
+        <div>
+          <AgePartInput value={age.days} onChange={(v) => onAgeChange("days", v)} max={31} placeholder="দিন" />
+          <p className="text-[10px] text-slate-400 text-center mt-1">দিন</p>
+        </div>
+      </div>
+      {preview && (
+        <p className="mt-1.5 text-xs font-medium text-blue-600 flex items-center gap-1">
+          <Calendar className="w-3 h-3" />
+          {preview}
+        </p>
+      )}
+    </div>
+  );
+};
 
 const SectionCard = ({ icon: Icon, title, children }) => (
   <div className="bg-white rounded-xl border border-slate-200 shadow-sm">
@@ -136,6 +214,7 @@ const AdmitPatient = () => {
   const [reqError, setReqError] = useState("");
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+  const handleAgeChange = (part, value) => setForm((f) => ({ ...f, age: { ...f.age, [part]: value } }));
   const selectedSpace = reqData.spaces.find((s) => s._id === form.spaceId) ?? null;
 
   useEffect(() => {
@@ -163,7 +242,7 @@ const AdmitPatient = () => {
   const handleSubmit = async () => {
     setError("");
     if (!form.name.trim()) return setError("রোগীর নাম প্রয়োজন");
-    if (!form.age) return setError("বয়স প্রয়োজন");
+    if (!isAgeFilled(form.age)) return setError("বয়স প্রয়োজন");
     if (!form.contactNumber) return setError("মোবাইল নম্বর প্রয়োজন");
     if (!form.spaceId) return setError("ওয়ার্ড/কেবিন নির্বাচন করুন");
 
@@ -198,7 +277,7 @@ const AdmitPatient = () => {
     const payload = {
       patient: {
         name: form.name.trim(),
-        age: parseInt(form.age),
+        age: normalizeAge(form.age),
         gender: form.gender,
         bloodGroup: form.bloodGroup || undefined,
         contactNumber: form.contactNumber.trim(),
@@ -297,16 +376,8 @@ const AdmitPatient = () => {
                   />
                 </Field>
 
-                <Field label="বয়স (বছর)" required>
-                  <IconInput
-                    icon={Calendar}
-                    type="number"
-                    min="0"
-                    max="150"
-                    value={form.age}
-                    onChange={(e) => set("age", e.target.value)}
-                    placeholder="বয়স"
-                  />
+                <Field label="বয়স" required>
+                  <AgeInputGroup age={form.age} onAgeChange={handleAgeChange} />
                 </Field>
 
                 <Field label="লিঙ্গ" required>
@@ -504,13 +575,13 @@ const AdmitPatient = () => {
                       }`}
                     />
                   </div>
-                  <span className="text-sm text-slate-700">তত্ত্বাবধায়ক ডাক্তারকেই মিডিয়া হিসেবে ব্যবহার করুন</span>
+                  <span className="text-sm text-slate-700">তত্ত্বাবধায়ক ডাক্তারকেই মিডিয়া হিসেবে ব্যবহার করুন</span>
                 </label>
 
                 {!form.useDoctorAsReferrer && (
-                  <Field label="মিডিয়া" optional>
+                  <Field label="মিডিয়া" optional>
                     <Select value={form.referrerId} onChange={(e) => set("referrerId", e.target.value)}>
-                      <option value="">— মিডিয়া নেই —</option>
+                      <option value="">— মিডিয়া নেই —</option>
                       {reqData.referrers.map((r) => (
                         <option key={r._id} value={r._id}>
                           {r.name} ({r.type})

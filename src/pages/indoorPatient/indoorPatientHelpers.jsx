@@ -27,6 +27,16 @@ export const fmt = {
           minute: "2-digit",
         })
       : "—",
+  // patient.patient.age is now { years, months, days } instead of a plain number
+  age: (age) => {
+    if (!age) return "—";
+    const years = age.years ?? 0;
+    const months = age.months ?? 0;
+    const days = age.days ?? 0;
+    if (years > 0) return months > 0 ? `${years} বছর ${months} মাস` : `${years} বছর`;
+    if (months > 0) return days > 0 ? `${months} মাস ${days} দিন` : `${months} মাস`;
+    return `${days} দিন`;
+  },
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────

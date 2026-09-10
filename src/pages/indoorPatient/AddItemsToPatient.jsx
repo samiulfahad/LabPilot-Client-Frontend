@@ -154,7 +154,7 @@ const PatientSearch = ({ onSelect, onError, onNetworkError }) => {
                     <div>
                       <div className="font-bold text-sm text-gray-800 font-noto">{p.patient?.name}</div>
                       <div className="text-xs text-gray-400 mt-0.5 font-mono">
-                        {p.admissionId} · {p.patient?.age}y · {p.space?.spaceName}
+                        {p.admissionId} · {fmt.age(p.patient?.age)} · {p.space?.spaceName}
                         {p.space?.bedNumber != null ? ` · Bed ${p.space.bedNumber}` : ""}
                       </div>
                     </div>

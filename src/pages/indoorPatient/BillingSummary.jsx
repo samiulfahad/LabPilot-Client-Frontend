@@ -800,7 +800,7 @@ export default function BillingSummary({
             <span>{patient.patient.name}</span>
             <span className="text-slate-300">·</span>
             <span>
-              {patient.patient.age}y / {patient.patient.gender}
+              {fmt.age(patient.patient.age)} / {patient.patient.gender}
             </span>
           </div>
         </div>
