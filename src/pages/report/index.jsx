@@ -131,6 +131,21 @@ const toInputDate = (dateStr) => {
   return isNaN(d) ? "" : d.toISOString().slice(0, 10);
 };
 
+// Age is now stored as { years, months, days } — any part may be absent
+// (defaults to 0 per patientAgeSchema). Render only the non-zero parts,
+// e.g. "34y 2m", "0y 7m 10d" -> "7m 10d", or "—" if the whole object is
+// empty/missing (legacy records without the new shape yet).
+const formatAge = (age) => {
+  if (!age || typeof age !== "object") return "—";
+  const { years = 0, months = 0, days = 0 } = age;
+  if (!years && !months && !days) return "—";
+  const parts = [];
+  if (years) parts.push(`${years} ${years === 1 ? "year" : "years"}`);
+  if (months) parts.push(`${months} ${months === 1 ? "month" : "months"}`);
+  if (days) parts.push(`${days} ${days === 1 ? "day" : "days"}`);
+  return parts.join(", ");
+};
+
 // ── Axios‑native network error detection (same as all other pages) ──────────
 const isNetworkError = (err) => err?.isAxiosError === true && !err.response;
 
@@ -729,7 +744,7 @@ const RecordDetail = ({ record, onDatesSaved, onNetworkError }) => {
             { label: "Name", val: record.patient?.name },
             { label: "Contact", val: record.patient?.contactNumber },
             { label: "Gender", val: record.patient?.gender, cap: true },
-            { label: "Age", val: record.patient?.age ? `${record.patient.age} yrs` : "—" },
+            { label: "Age", val: formatAge(record.patient?.age) },
           ].map(({ label, val, cap }) => (
             <div key={label} className="min-w-0">
               <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-0.5">{label}</p>

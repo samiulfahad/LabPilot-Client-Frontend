@@ -18,6 +18,34 @@ import {
   Activity,
 } from "lucide-react";
 
+// ─── Age helpers ────────────────────────────────────────────────────────────
+// Age is now stored as { years, months, days } (any part may be absent,
+// defaults to 0). Range lookups need a single decimal-year number to
+// compare against minAge/maxAge; display needs a readable string.
+
+function ageToDecimalYears(age) {
+  if (age === null || age === undefined || age === "") return null;
+  if (typeof age === "number") return age; // legacy numeric age, kept for safety
+  if (typeof age === "object") {
+    const { years = 0, months = 0, days = 0 } = age;
+    if (!years && !months && !days) return null;
+    return years + months / 12 + days / 365;
+  }
+  const parsed = parseFloat(age);
+  return isNaN(parsed) ? null : parsed;
+}
+
+function formatAge(age) {
+  if (!age || typeof age !== "object") return "—";
+  const { years = 0, months = 0, days = 0 } = age;
+  if (!years && !months && !days) return "—";
+  const parts = [];
+  if (years) parts.push(`${years} ${years === 1 ? "year" : "years"}`);
+  if (months) parts.push(`${months} ${months === 1 ? "month" : "months"}`);
+  if (days) parts.push(`${days} ${days === 1 ? "day" : "days"}`);
+  return parts.join(", ");
+}
+
 // ─── Range logic (unchanged) ──────────────────────────────────────────────────
 
 export function getStandardRange(field, patientAge, patientGender) {
@@ -25,20 +53,24 @@ export function getStandardRange(field, patientAge, patientGender) {
   if (!sr || sr.type === "none") return null;
   if (sr.type === "simple") return { min: parseFloat(sr.data.min), max: parseFloat(sr.data.max) };
   if (sr.type === "age" && patientAge) {
-    const age = parseFloat(patientAge);
-    const row = sr.data.find((r) => age >= parseFloat(r.minAge) && age <= parseFloat(r.maxAge));
-    if (row) return { min: parseFloat(row.minValue), max: parseFloat(row.maxValue) };
+    const age = ageToDecimalYears(patientAge);
+    if (age !== null) {
+      const row = sr.data.find((r) => age >= parseFloat(r.minAge) && age <= parseFloat(r.maxAge));
+      if (row) return { min: parseFloat(row.minValue), max: parseFloat(row.maxValue) };
+    }
   }
   if (sr.type === "gender" && patientGender) {
     const g = sr.data[patientGender];
     if (g) return { min: parseFloat(g.min), max: parseFloat(g.max) };
   }
   if (sr.type === "combined" && patientAge && patientGender) {
-    const age = parseFloat(patientAge);
-    const row = sr.data.find(
-      (r) => r.gender === patientGender && age >= parseFloat(r.minAge) && age <= parseFloat(r.maxAge),
-    );
-    if (row) return { min: parseFloat(row.minValue), max: parseFloat(row.maxValue) };
+    const age = ageToDecimalYears(patientAge);
+    if (age !== null) {
+      const row = sr.data.find(
+        (r) => r.gender === patientGender && age >= parseFloat(r.minAge) && age <= parseFloat(r.maxAge),
+      );
+      if (row) return { min: parseFloat(row.minValue), max: parseFloat(row.maxValue) };
+    }
   }
   return null;
 }
@@ -520,7 +552,7 @@ function PatientBanner({ invoice }) {
   const { patient } = invoice;
   const cells = [
     { label: "Full Name", val: patient.name },
-    { label: "Age", val: `${patient.age} yrs` },
+    { label: "Age", val: formatAge(patient.age) },
     { label: "Gender", val: patient.gender, cap: true },
     { label: "Contact", val: patient.contactNumber },
   ];

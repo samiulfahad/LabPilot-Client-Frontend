@@ -19,6 +19,22 @@ const getErrorMessage = (err, fallback) => {
 // ── Axios‑native network error detection (same as all other pages) ──────────
 const isNetworkError = (err) => err?.isAxiosError === true && !err.response;
 
+// Age is now { years, months, days } (any part may be absent, defaults to
+// 0). ReportViewer / ReportPDFDocument only ever render patient.age as an
+// already-formatted string, so the conversion happens once, here, at the
+// source. Kept spelled-out to match the format used in Report.jsx /
+// SchemaRenderer.jsx's PatientBanner.
+const formatAge = (age) => {
+  if (!age || typeof age !== "object") return "";
+  const { years = 0, months = 0, days = 0 } = age;
+  if (!years && !months && !days) return "";
+  const parts = [];
+  if (years) parts.push(`${years} ${years === 1 ? "year" : "years"}`);
+  if (months) parts.push(`${months} ${months === 1 ? "month" : "months"}`);
+  if (days) parts.push(`${days} ${days === 1 ? "day" : "days"}`);
+  return parts.join(", ");
+};
+
 // ─── Portal hook ──────────────────────────────────────────────────────────────
 function useBodyPortal() {
   const [el, setEl] = useState(null);
@@ -131,7 +147,7 @@ export default function ReportDownload() {
         setReport(data.report);
         setPatient({
           name: data.patient?.name ?? "",
-          age: data.patient?.age != null ? `${data.patient.age} yrs` : "",
+          age: formatAge(data.patient?.age),
           gender: data.patient?.gender ?? "",
           contact: data.patient?.contactNumber ?? "",
           referredBy: data.referrer?.name ?? "",
