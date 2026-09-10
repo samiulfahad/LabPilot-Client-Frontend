@@ -12,6 +12,7 @@ const testService = {
   deleteTest: (_id) => api.delete(`/test/${_id}`),
   getSchemasByTestId: (testId) => api.get("/test/schema/" + testId),
   getSchemaBySchemaId: (schemaId) => api.get("/schema/" + schemaId),
+  checkManualDuplicate: (name) => api.get("/test/manual/check-duplicate", { params: { name } }),
 };
 
 export default testService;

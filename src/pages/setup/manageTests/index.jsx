@@ -60,6 +60,10 @@ const STATUS_OPTIONS = [
   { value: "offline", label: "অফলাইন" },
 ];
 
+// Debounce (ms) before firing GET /test/manual/check-duplicate as the user
+// types a manual test name — mirrors the admin catalog's own debounce.
+const DUPLICATE_CHECK_DEBOUNCE_MS = 400;
+
 // ── Error helpers ──────────────────────────────────────────────────────────────
 const PERMISSION_DENIED_MESSAGE = "আপনার কর্তৃপক্ষ আপনাকে এই কাজটি করার বা এই তথ্যটি পাওয়ার অনুমতি দেয়নি।";
 const getErrorMessage = (err, fallback) => {
@@ -504,6 +508,10 @@ const ManualAddTestModal = ({ initialName, onClose, onAdded, onNetworkError }) =
   const [commission, setCommission] = useState("");
   const [saving, setSaving] = useState(false);
   const [apiError, setApiError] = useState("");
+  // Duplicate-name check against this lab's own tests — mirrors the admin
+  // catalog's DupWarning contract: `exact` blocks submission, `fuzzy` is
+  // informational only (see GET /test/manual/check-duplicate).
+  const [dup, setDup] = useState({ checking: false, exact: null, fuzzy: [] });
 
   const trimmedName = name.trim();
   const numericPrice = parseFloat(price);
@@ -511,10 +519,36 @@ const ManualAddTestModal = ({ initialName, onClose, onAdded, onNetworkError }) =
   const priceInvalid = price === "" || isNaN(numericPrice) || numericPrice < 0;
   const commissionInvalid = commission !== "" && (isNaN(numericCommission) || numericCommission < 0);
   const exceedsPrice = !priceInvalid && !commissionInvalid && (parseFloat(commission) || 0) > numericPrice;
-  const invalid = trimmedName.length === 0 || priceInvalid || commissionInvalid || exceedsPrice;
+  const invalid = trimmedName.length === 0 || priceInvalid || commissionInvalid || exceedsPrice || !!dup.exact;
+
+  // Debounced call to GET /test/manual/check-duplicate as the name changes.
+  useEffect(() => {
+    if (!trimmedName) {
+      setDup({ checking: false, exact: null, fuzzy: [] });
+      return;
+    }
+
+    let cancelled = false;
+    setDup((d) => ({ ...d, checking: true }));
+
+    const handle = setTimeout(async () => {
+      try {
+        const { data } = await testService.checkManualDuplicate(trimmedName);
+        if (cancelled) return;
+        setDup({ checking: false, exact: data.exact ?? null, fuzzy: data.fuzzy ?? [] });
+      } catch {
+        if (!cancelled) setDup({ checking: false, exact: null, fuzzy: [] });
+      }
+    }, DUPLICATE_CHECK_DEBOUNCE_MS);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(handle);
+    };
+  }, [trimmedName]);
 
   const handleSubmit = async () => {
-    if (invalid) return;
+    if (invalid || dup.exact) return; // safety net alongside the disabled button state
     setSaving(true);
     setApiError("");
     try {
@@ -592,6 +626,22 @@ const ManualAddTestModal = ({ initialName, onClose, onAdded, onNetworkError }) =
                 if (e.key === "Enter" && !invalid && !saving) handleSubmit();
               }}
             />
+
+            {/* Duplicate-name feedback — checking / exact (blocks) / fuzzy (informational) */}
+            {dup.checking && (
+              <p className="mt-2 font-['IBM_Plex_Mono',monospace] text-[10.5px] text-[#94A3B8]">যাচাই করা হচ্ছে…</p>
+            )}
+            {!dup.checking && dup.exact && (
+              <p className="mt-2 font-['IBM_Plex_Mono',monospace] text-[10.5px] text-[#EF4444] flex items-center gap-1.5">
+                <AlertCircle className="w-3 h-3 shrink-0" />"{dup.exact.name}" নামে টেস্ট ইতিমধ্যে আছে
+              </p>
+            )}
+            {!dup.checking && !dup.exact && dup.fuzzy.length > 0 && (
+              <p className="mt-2 font-['IBM_Plex_Mono',monospace] text-[10.5px] text-[#F59E0B]">
+                আপনি কি বোঝাতে চেয়েছেন: {dup.fuzzy.map((f) => f.name).join(", ")}?
+              </p>
+            )}
+
             <p className="mt-2 font-['IBM_Plex_Mono',monospace] text-[10.5px] text-[#94A3B8] leading-relaxed">
               এই টেস্টটি ক্যাটালগে পাওয়া যায়নি। নাম, মূল্য ও কমিশন দিয়ে যোগ করুন — ফরম্যাট পরে সেট করা যাবে।
             </p>
