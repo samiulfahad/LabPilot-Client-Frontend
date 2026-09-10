@@ -2,7 +2,7 @@
  * useCallback / useMemo are intentionally absent throughout this file.
  * babel-plugin-react-compiler handles all memoization automatically.
  */
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, forwardRef } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   FileText,
@@ -44,6 +44,26 @@ const PAYMENT_MODES = [
   { value: "card", label: "Card" },
   { value: "bank_transfer", label: "Bank Transfer" },
   { value: "others", label: "Others" },
+];
+
+// Order in which "Enter" moves focus from one field to the next.
+// The "use doctor as referrer" toggle (and every other toggle switch) is a
+// click/tap action, not a typing field, so it is intentionally NOT part of
+// this chain — Enter skips straight over it.
+const FIELD_ORDER = [
+  "patientName",
+  "ageYears",
+  "ageMonths",
+  "ageDays",
+  "contactNumber",
+  "gender",
+  "doctorSearch",
+  "referrerSearch",
+  "itemSearch",
+  "referrerDiscountAmount",
+  "labAdjustmentAmount",
+  "paidAmount",
+  "paymentMode",
 ];
 
 const INITIAL_FORM = {
@@ -204,48 +224,76 @@ const Field = ({ label, required, optional, children }) => (
 
 const blurOnWheel = (e) => e.currentTarget.blur();
 
-const IconInput = ({ icon: Icon, className = "", ...props }) => (
+// forwardRef so parent components can register these inputs in the
+// Enter-to-next-field focus chain (see FIELD_ORDER / registerField).
+const IconInput = forwardRef(({ icon: Icon, className = "", ...props }, ref) => (
   <div className="relative">
     <Icon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none z-10" />
     <input
+      ref={ref}
       className={`w-full pl-9 pr-4 py-2.5 border border-gray-300 rounded-lg text-sm
         focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 ${className}`}
       {...props}
       onWheel={props.type === "number" ? blurOnWheel : props.onWheel}
     />
   </div>
-);
+));
+IconInput.displayName = "IconInput";
 
-const AgePartInput = ({ value, onChange, max, placeholder }) => (
+const AgePartInput = forwardRef(({ value, onChange, max, placeholder, onKeyDown }, ref) => (
   <input
+    ref={ref}
     type="number"
     inputMode="numeric"
     value={value}
     onChange={(e) => onChange(e.target.value)}
     onWheel={blurOnWheel}
+    onKeyDown={onKeyDown}
     min="0"
     max={max}
     placeholder={placeholder}
     className="w-full text-center py-2.5 px-2 border border-gray-300 rounded-lg text-sm
       focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
   />
-);
+));
+AgePartInput.displayName = "AgePartInput";
 
-const AgeInputGroup = ({ age, onAgeChange }) => {
+const AgeInputGroup = ({ age, onAgeChange, fieldRefs = {}, onFieldKeyDown = {} }) => {
   const preview = formatAge(age);
   return (
     <div>
       <div className="grid grid-cols-3 gap-2">
         <div>
-          <AgePartInput value={age.years} onChange={(v) => onAgeChange("years", v)} max={150} placeholder="Years" />
+          <AgePartInput
+            ref={fieldRefs.years}
+            value={age.years}
+            onChange={(v) => onAgeChange("years", v)}
+            max={150}
+            placeholder="Years"
+            onKeyDown={onFieldKeyDown.years}
+          />
           <p className="text-[10px] text-gray-400 text-center mt-1">Years</p>
         </div>
         <div>
-          <AgePartInput value={age.months} onChange={(v) => onAgeChange("months", v)} max={11} placeholder="Months" />
+          <AgePartInput
+            ref={fieldRefs.months}
+            value={age.months}
+            onChange={(v) => onAgeChange("months", v)}
+            max={11}
+            placeholder="Months"
+            onKeyDown={onFieldKeyDown.months}
+          />
           <p className="text-[10px] text-gray-400 text-center mt-1">Months</p>
         </div>
         <div>
-          <AgePartInput value={age.days} onChange={(v) => onAgeChange("days", v)} max={31} placeholder="Days" />
+          <AgePartInput
+            ref={fieldRefs.days}
+            value={age.days}
+            onChange={(v) => onAgeChange("days", v)}
+            max={31}
+            placeholder="Days"
+            onKeyDown={onFieldKeyDown.days}
+          />
           <p className="text-[10px] text-gray-400 text-center mt-1">Days</p>
         </div>
       </div>
@@ -331,7 +379,7 @@ const ToggleSwitch = ({ checked, onChange, icon: Icon, label, disabled }) => (
 
 // ─── Payment mode selector ─────────────────────────────────────────────────
 
-const PaymentModeSelector = ({ value, onChange }) => (
+const PaymentModeSelector = ({ value, onChange, firstButtonRef, onEnterNext }) => (
   <div>
     <div className="flex items-center gap-2 mb-2">
       <div className="p-1.5 bg-blue-50 rounded">
@@ -340,11 +388,22 @@ const PaymentModeSelector = ({ value, onChange }) => (
       <span className="text-sm font-medium text-gray-700">Payment Mode</span>
     </div>
     <div className="flex flex-wrap gap-2">
-      {PAYMENT_MODES.map((mode) => (
+      {PAYMENT_MODES.map((mode, idx) => (
         <button
           key={mode.value}
+          ref={idx === 0 ? firstButtonRef : undefined}
           type="button"
           onClick={() => onChange(mode.value)}
+          onKeyDown={(e) => {
+            // Enter both picks this mode and signals "done with the form" —
+            // since Payment Mode is the last field in the chain, this is
+            // what opens the invoice preview (see focusNextField's fallback).
+            if (e.key === "Enter") {
+              e.preventDefault();
+              onChange(mode.value);
+              onEnterNext?.();
+            }
+          }}
           aria-pressed={value === mode.value}
           className={`px-3.5 py-2 rounded-lg text-sm font-medium border transition-colors ${
             value === mode.value
@@ -376,6 +435,14 @@ const InvoiceSummary = ({ formData, amount, onConfirm, onClose }) => {
   } = formData;
   const effectiveReferrer = useDoctorAsReferrer ? doctor : referredBy;
   const due = Math.max(0, amount.final - amount.paid);
+
+  // The preview was just opened by pressing Enter on the last form field, so
+  // move focus straight to "Confirm & Create" — the next Enter then creates
+  // the invoice, without the user having to click or tab to it.
+  const confirmButtonRef = useRef(null);
+  useEffect(() => {
+    confirmButtonRef.current?.focus();
+  }, []);
 
   return (
     <div className="bg-white rounded-2xl max-h-[90vh] overflow-hidden flex flex-col shadow-xl">
@@ -520,6 +587,7 @@ const InvoiceSummary = ({ formData, amount, onConfirm, onClose }) => {
           Cancel
         </button>
         <button
+          ref={confirmButtonRef}
           onClick={onConfirm}
           className="px-5 py-2.5 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors shadow-sm"
         >
@@ -590,6 +658,40 @@ const InvoiceForm = ({
   const referrerOptionRefs = useRef([]);
   const doctorOptionRefs = useRef([]);
   const itemOptionRefs = useRef([]);
+
+  // ── "Enter moves to next field" chain ──────────────────────────────────
+  // fieldRefs holds the live DOM node for every field that participates in
+  // FIELD_ORDER. Fields that aren't currently rendered (e.g. the referrer
+  // discount input when the discount isn't enabled) simply never register a
+  // ref, so focusNextField skips right past them. Toggle switches (like
+  // "use doctor as referrer") never register here, so Enter always skips them.
+  const fieldRefs = useRef({});
+  const formRef = useRef(null);
+  const registerField = (key) => (el) => {
+    fieldRefs.current[key] = el;
+  };
+
+  const focusNextField = (fromKey) => {
+    const idx = FIELD_ORDER.indexOf(fromKey);
+    if (idx === -1) return;
+    for (let i = idx + 1; i < FIELD_ORDER.length; i++) {
+      const el = fieldRefs.current[FIELD_ORDER[i]];
+      if (el && !el.disabled) {
+        el.focus();
+        return;
+      }
+    }
+    // Nothing left after this field (Payment Mode, normally) — Enter here
+    // means "I'm done with the form", so submit it, which runs the usual
+    // validation and opens the invoice preview.
+    formRef.current?.requestSubmit();
+  };
+
+  const handleEnterToNext = (fromKey) => (e) => {
+    if (e.key !== "Enter") return;
+    e.preventDefault();
+    focusNextField(fromKey);
+  };
 
   const {
     patient,
@@ -680,7 +782,26 @@ const InvoiceForm = ({
     setItemActiveIndex(-1);
   };
 
-  const handleDropdownKeyDown = (e, { isOpen, list, activeIndex, setActiveIndex, onSelect, refsArr, closeDrop }) => {
+  // Enter always does one of two things: select the highlighted dropdown
+  // item (and, if advanceOnSelect is true, move on to nextFieldKey), or —
+  // when nothing is highlighted / the dropdown is closed — just move on to
+  // nextFieldKey. Either way Enter never falls through to submit the form.
+  const handleDropdownKeyDown = (
+    e,
+    { isOpen, list, activeIndex, setActiveIndex, onSelect, refsArr, closeDrop, advanceOnSelect = false, nextFieldKey },
+  ) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      if (isOpen && list.length > 0 && activeIndex >= 0 && activeIndex < list.length) {
+        onSelect(list[activeIndex]);
+        if (advanceOnSelect && nextFieldKey) focusNextField(nextFieldKey);
+        return;
+      }
+      closeDrop();
+      if (nextFieldKey) focusNextField(nextFieldKey);
+      return;
+    }
+
     if (!isOpen || list.length === 0) return;
 
     if (e.key === "ArrowDown") {
@@ -693,11 +814,6 @@ const InvoiceForm = ({
       const next = activeIndex > 0 ? activeIndex - 1 : list.length - 1;
       setActiveIndex(next);
       scrollActiveIntoView(refsArr, next);
-    } else if (e.key === "Enter") {
-      if (activeIndex >= 0 && activeIndex < list.length) {
-        e.preventDefault();
-        onSelect(list[activeIndex]);
-      }
     } else if (e.key === "Escape") {
       setActiveIndex(-1);
       closeDrop();
@@ -751,12 +867,14 @@ const InvoiceForm = ({
   };
 
   return (
-    <form onSubmit={onSubmit} className="space-y-6">
+    <form ref={formRef} onSubmit={onSubmit} className="space-y-6">
       <SectionCard icon={UserCircle} title="Patient Information">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
           <Field label="Patient Name" required>
             <IconInput
               icon={User}
+              ref={registerField("patientName")}
+              onKeyDown={handleEnterToNext("patientName")}
               value={patient.name}
               onChange={(e) => onPatientChange("name", e.target.value)}
               placeholder="Enter patient's full name"
@@ -765,12 +883,27 @@ const InvoiceForm = ({
           </Field>
 
           <Field label="Age" required>
-            <AgeInputGroup age={patient.age} onAgeChange={onAgeChange} />
+            <AgeInputGroup
+              age={patient.age}
+              onAgeChange={onAgeChange}
+              fieldRefs={{
+                years: registerField("ageYears"),
+                months: registerField("ageMonths"),
+                days: registerField("ageDays"),
+              }}
+              onFieldKeyDown={{
+                years: handleEnterToNext("ageYears"),
+                months: handleEnterToNext("ageMonths"),
+                days: handleEnterToNext("ageDays"),
+              }}
+            />
           </Field>
 
           <Field label="Contact Number" optional>
             <IconInput
               icon={Phone}
+              ref={registerField("contactNumber")}
+              onKeyDown={handleEnterToNext("contactNumber")}
               type="tel"
               value={patient.contactNumber}
               onChange={(e) => onPatientChange("contactNumber", e.target.value)}
@@ -780,6 +913,11 @@ const InvoiceForm = ({
           </Field>
 
           <Field label="Gender" required>
+            {/* Native radios already support Left/Right/Up/Down to move
+                between the group and select as they go. We only add: (1)
+                auto-selecting "male" the first time focus lands here with
+                nothing chosen yet, and (2) Enter moving on to the next
+                field instead of submitting the form. */}
             <div className="flex gap-2">
               {GENDERS.map((g) => (
                 <label
@@ -791,11 +929,25 @@ const InvoiceForm = ({
                   }`}
                 >
                   <input
+                    ref={g === "male" ? registerField("gender") : undefined}
                     type="radio"
                     name="gender"
                     value={g}
                     checked={patient.gender === g}
                     onChange={() => onPatientChange("gender", g)}
+                    onFocus={
+                      g === "male"
+                        ? () => {
+                            if (!patient.gender) onPatientChange("gender", "male");
+                          }
+                        : undefined
+                    }
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        focusNextField("gender");
+                      }
+                    }}
                     className="sr-only"
                     required={!patient.gender}
                   />
@@ -811,6 +963,7 @@ const InvoiceForm = ({
                 <div className="relative">
                   <Stethoscope className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 z-10" />
                   <input
+                    ref={registerField("doctorSearch")}
                     type="text"
                     value={doctorDisplayValue}
                     onChange={(e) => {
@@ -832,6 +985,8 @@ const InvoiceForm = ({
                         onSelect: selectDoctor,
                         refsArr: doctorOptionRefs,
                         closeDrop: () => setShowDoctorDrop(false),
+                        advanceOnSelect: true,
+                        nextFieldKey: "doctorSearch",
                       })
                     }
                     onBlur={() => {
@@ -922,6 +1077,7 @@ const InvoiceForm = ({
                 <div className="relative">
                   <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 z-10" />
                   <input
+                    ref={registerField("referrerSearch")}
                     type="text"
                     value={referrerDisplayValue}
                     disabled={useDoctorAsReferrer}
@@ -941,6 +1097,8 @@ const InvoiceForm = ({
                         onSelect: selectReferrer,
                         refsArr: referrerOptionRefs,
                         closeDrop: () => setShowReferrerDrop(false),
+                        advanceOnSelect: true,
+                        nextFieldKey: "referrerSearch",
                       })
                     }
                     onBlur={() => {
@@ -1036,6 +1194,7 @@ const InvoiceForm = ({
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
             <input
+              ref={registerField("itemSearch")}
               type="text"
               value={itemQuery}
               onChange={(e) => {
@@ -1052,6 +1211,11 @@ const InvoiceForm = ({
                   onSelect: selectItem,
                   refsArr: itemOptionRefs,
                   closeDrop: () => setShowItemDrop(false),
+                  // Stay in the search box after picking an item so the
+                  // user can keep adding more tests/products. Enter only
+                  // moves on once there's nothing left to select.
+                  advanceOnSelect: false,
+                  nextFieldKey: "itemSearch",
                 })
               }
               className="w-full pl-9 pr-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
@@ -1292,6 +1456,8 @@ const InvoiceForm = ({
                   >
                     <IconInput
                       icon={effectiveReferrer.commissionType === "percentage" ? Percent : DollarSign}
+                      ref={registerField("referrerDiscountAmount")}
+                      onKeyDown={handleEnterToNext("referrerDiscountAmount")}
                       type="number"
                       value={referrerDiscount}
                       onChange={(e) => clampDiscount(e.target.value)}
@@ -1331,6 +1497,8 @@ const InvoiceForm = ({
                   >
                     <IconInput
                       icon={DollarSign}
+                      ref={registerField("labAdjustmentAmount")}
+                      onKeyDown={handleEnterToNext("labAdjustmentAmount")}
                       type="number"
                       value={labAdjustmentAmount}
                       onChange={(e) => clampLabAdjustment(e.target.value)}
@@ -1386,6 +1554,8 @@ const InvoiceForm = ({
             </div>
             <IconInput
               icon={Wallet}
+              ref={registerField("paidAmount")}
+              onKeyDown={handleEnterToNext("paidAmount")}
               type="number"
               value={paidAmount}
               onChange={(e) => onChange("paidAmount", e.target.value)}
@@ -1395,7 +1565,12 @@ const InvoiceForm = ({
               className="focus:ring-green-500/20 focus:border-green-500"
             />
 
-            <PaymentModeSelector value={paymentMode} onChange={(val) => onChange("paymentMode", val)} />
+            <PaymentModeSelector
+              value={paymentMode}
+              onChange={(val) => onChange("paymentMode", val)}
+              firstButtonRef={registerField("paymentMode")}
+              onEnterNext={() => focusNextField("paymentMode")}
+            />
 
             {amount.final > 0 && (
               <div className="p-4 rounded-lg border border-gray-200 bg-gray-50 space-y-2 text-sm">
