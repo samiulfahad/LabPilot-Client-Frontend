@@ -32,6 +32,31 @@ const formatDateTime = (ts) => {
   };
 };
 
+// ── Age helpers ──────────────────────────────────────────────────────────────
+// Patient age is stored/sent as { years, months, days } (see CreateInvoice.jsx
+// and invoiceRoutes.js). Format it into a compact single string here —
+// "24years 5months 10days" — skipping any zero/blank part. Also tolerates the
+// legacy shape (a bare number/string, from invoices created before this
+// change) by falling back to "<n> years".
+const formatAge = (age) => {
+  if (age === null || age === undefined || age === "") return "N/A";
+
+  // Legacy shape: a plain number or numeric string.
+  if (typeof age === "number" || typeof age === "string") {
+    return `${age} years`;
+  }
+
+  // Current shape: { years, months, days }.
+  const years = parseInt(age.years, 10) || 0;
+  const months = parseInt(age.months, 10) || 0;
+  const days = parseInt(age.days, 10) || 0;
+  const parts = [];
+  if (years > 0) parts.push(`${years}years`);
+  if (months > 0) parts.push(`${months}months`);
+  if (days > 0) parts.push(`${days}days`);
+  return parts.length > 0 ? parts.join(" ") : "0years";
+};
+
 /** Normalise raw data from either router state or API response into a consistent shape. */
 const normaliseInvoice = (raw) => ({
   invoiceId: raw.invoiceId || "",
@@ -39,7 +64,9 @@ const normaliseInvoice = (raw) => ({
   patient: {
     name: raw.patient?.name || "N/A",
     gender: raw.patient?.gender || "N/A",
-    age: raw.patient?.age || "N/A",
+    // Kept as-is (object or legacy number/string) — formatAge() handles both
+    // shapes at display time, in both the HTML card and the PDF.
+    age: raw.patient?.age ?? null,
     contactNumber: raw.patient?.contactNumber || "N/A",
   },
   // Only field consulted for the "Doctor's Name" display — referrer is
@@ -165,8 +192,9 @@ const pdf$ = StyleSheet.create({
   section: { paddingTop: 12, paddingBottom: 12, borderBottom: "1 solid #e5e7eb" },
   sectionLast: { paddingTop: 12 },
   // patient grid — three columns. Invoice ID (1/3) and Full Name (2/3) share
-  // the first row, then Gender / Age / Date / Contact / Time fill in as
-  // before, with Doctor's Name (when present) spanning all three.
+  // the first row. Gender / Age / Contact fill the second row together,
+  // Date / Time fill the third, with Doctor's Name (when present) spanning
+  // all three below that.
   patientRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" },
   patientGrid: { flex: 1, flexDirection: "row", flexWrap: "wrap" },
   patientField: { width: "33.33%", marginBottom: 6, paddingRight: 6 },
@@ -270,9 +298,9 @@ const InvoicePDF = ({ invoice, qrCodeUrl, date, time, labInfo, hideDownloadButto
               <PDFField label="Invoice ID" value={invoiceId || "N/A"} style={pdf$.patientField} />
               <PDFField label="Full Name" value={patient.name} style={pdf$.patientFieldWide} />
               <PDFField label="Gender" value={patient.gender} style={pdf$.patientField} />
-              <PDFField label="Age" value={`${patient.age} years`} style={pdf$.patientField} />
-              <PDFField label="Date" value={date} style={pdf$.patientField} />
+              <PDFField label="Age" value={formatAge(patient.age)} style={pdf$.patientField} />
               <PDFField label="Contact" value={patient.contactNumber} style={pdf$.patientField} />
+              <PDFField label="Date" value={date} style={pdf$.patientField} />
               <PDFField label="Time" value={time} style={pdf$.patientField} />
               {flags.showDoctorName && (
                 <PDFField label="Doctor's Name" value={flags.doctorNameLabel} style={pdf$.patientFieldFull} />
@@ -443,8 +471,9 @@ const InvoiceCard = ({ invoice, qrCodeUrl, date, time, labInfo }) => {
         </div>
       </div>
 
-      {/* Patient — Invoice ID (1/3) and Full Name (2/3) share the first row,
-          then Gender / Age / Date / Contact / Time fill in as before. */}
+      {/* Patient — Invoice ID (1/3) and Full Name (2/3) share the first row.
+          Gender / Age / Contact fill the second row together, Date / Time
+          fill the third. */}
       <div className="px-6 py-4 border-b border-gray-200">
         <div className="flex items-start gap-4">
           <div className="grid grid-cols-3 gap-x-4 gap-y-2 flex-1">
@@ -453,9 +482,9 @@ const InvoiceCard = ({ invoice, qrCodeUrl, date, time, labInfo }) => {
               <PatientField label="Full Name" value={patient.name} />
             </div>
             <PatientField label="Gender" value={<span className="capitalize">{patient.gender}</span>} />
-            <PatientField label="Date" value={date} />
-            <PatientField label="Age" value={`${patient.age} years`} />
+            <PatientField label="Age" value={formatAge(patient.age)} />
             <PatientField label="Contact" value={patient.contactNumber} />
+            <PatientField label="Date" value={date} />
             <PatientField label="Time" value={time} />
             {flags.showDoctorName && (
               <div className="col-span-3">

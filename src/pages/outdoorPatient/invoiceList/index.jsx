@@ -17,7 +17,6 @@ import {
   Phone,
   Calendar,
   ChevronDown,
-  ChevronUp,
   X,
   Eye,
   UserCircle,
@@ -32,7 +31,8 @@ import {
   CreditCard,
   Loader2,
   Search,
-  MoreHorizontal,
+  Cake,
+  VenusAndMars,
 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import Popup from "../../../components/popup";
@@ -71,6 +71,19 @@ const formatDateTime = (ts) => {
 const formatDateTimeLine = (ts) => {
   const { date, time } = formatDateTime(ts);
   return `${date} · ${time}`;
+};
+
+// Patient age is stored server-side as { years, months, days } (see
+// invoiceRoutes.js patientAgeSchema) rather than a single number, so
+// newborns/infants can be recorded precisely. Format as a compact string,
+// skipping zero parts — e.g. "24y", "5m 10d", "0d" if somehow all-zero.
+const formatAge = (age) => {
+  if (!age) return "—";
+  const parts = [];
+  if (age.years) parts.push(`${age.years}y`);
+  if (age.months) parts.push(`${age.months}m`);
+  if (age.days) parts.push(`${age.days}d`);
+  return parts.length ? parts.join(" ") : "0d";
 };
 
 const getDue = (inv) => Math.max(0, (inv.amount?.final ?? 0) - (inv.amount?.paid ?? 0));
@@ -128,6 +141,12 @@ const PAYMENT_MODES = [
   { value: "bank_transfer", label: "Bank Transfer" },
   { value: "others", label: "Others" },
 ];
+
+// Contact numbers are required to be exactly 11 digits (standard BD mobile
+// number length, e.g. 01XXXXXXXXX). Enforced client-side on entry (digits-
+// only, hard-capped at 11 chars) and again before submit.
+const PHONE_LENGTH = 11;
+const isValidPhone = (value) => new RegExp(`^\\d{${PHONE_LENGTH}}$`).test((value || "").trim());
 
 // ─── Copy Invoice ID Button ───────────────────────────────────────────────────
 
@@ -327,7 +346,28 @@ const CollectDueModal = ({ invoice, isOpen, onClose, onConfirm, onNetworkError }
   );
 };
 
-// ─── Invoice Card ──────────────────────────────────────────────────────────────
+// ─── Action chips (matches SearchInvoice.jsx's ResultCard styling exactly) ────
+
+const ActionChip = ({ onClick, icon: Icon, label, className }) => (
+  <button
+    onClick={onClick}
+    className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all ${className}`}
+  >
+    <Icon className="w-3.5 h-3.5" /> {label}
+  </button>
+);
+
+const ActionLinkChip = ({ to, state, icon: Icon, label, className }) => (
+  <Link
+    to={to}
+    state={state}
+    className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all ${className}`}
+  >
+    <Icon className="w-3.5 h-3.5" /> {label}
+  </Link>
+);
+
+// ─── Invoice Card (same visual design as SearchInvoice.jsx's ResultCard) ──────
 
 const InvoiceCard = ({
   invoice,
@@ -345,14 +385,12 @@ const InvoiceCard = ({
   const [collectingDue, setCollectingDue] = useState(false);
   const [editingPatient, setEditingPatient] = useState(false);
   const [viewingDetails, setViewingDetails] = useState(false);
-  const [actionsOpen, setActionsOpen] = useState(false);
 
   const due = getDue(invoice);
   const fullyPaid = isFullyPaid(invoice);
   const delivered = isDelivered(invoice);
   const hasReports = hasReportSchemas(invoice);
   const patient = invoice.patient;
-  const creatorName = invoice.createdBy?.name;
 
   const handleConfirmDelivery = async () => {
     setConfirming(false);
@@ -426,125 +464,94 @@ const InvoiceCard = ({
         onError={onError}
       />
 
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-        {/* Top row: patient + status */}
-        <div className="px-4 pt-4 pb-3 flex items-start justify-between gap-3">
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2 mb-1">
-              <span className="text-[10px] font-mono text-slate-300 tabular-nums shrink-0">
-                {String(index + 1).padStart(2, "0")}
-              </span>
-              <h3 className="text-[15px] font-semibold text-slate-900 truncate">{patient.name}</h3>
+      <div className="no-print">
+        <div className="bg-white shadow-sm border border-gray-100 hover:shadow-md hover:border-indigo-100 transition-all duration-200 overflow-hidden">
+          {/* Header */}
+          <div className="flex items-center gap-3 px-4 pt-3.5 pb-3">
+            <div className="w-8 h-8 bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shrink-0 shadow-sm">
+              <span className="text-[11px] font-bold text-white">{index + 1}</span>
             </div>
-            <div className="flex items-center gap-1 text-xs text-slate-400">
-              <span className="font-mono">#{invoice.invoiceId}</span>
-              <CopyIdButton value={invoice.invoiceId} />
+            <div className="flex-1 min-w-0">
+              <p className="font-bold text-gray-900 text-sm leading-tight truncate">{patient.name}</p>
+              <p className="text-[11px] text-gray-400 mt-0.5 truncate">
+                #{invoice.invoiceId} · {date} · {time}
+                {invoice.createdBy?.name && (
+                  <span className="text-gray-300 hidden sm:inline"> · by {invoice.createdBy.name}</span>
+                )}
+              </p>
             </div>
-          </div>
-          <div className="text-right shrink-0">
-            <p className="text-base font-bold text-slate-900 tabular-nums">{fmt(invoice.amount?.final ?? 0)}</p>
-            <div className="flex items-center justify-end gap-1.5 mt-1">
-              {delivered && (
-                <span className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-blue-600">
-                  <PackageCheck className="w-3 h-3" /> ডেলিভারি
-                </span>
-              )}
+            <div className="flex items-center gap-1.5 shrink-0">
               {fullyPaid ? (
-                <span className="text-[10px] font-semibold uppercase tracking-wide text-emerald-600">পরিশোধিত</span>
+                <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-green-50 text-green-700 border border-green-100 text-xs font-medium">
+                  <CheckCircle2 className="w-3 h-3" /> Paid
+                </span>
               ) : (
-                <span className="text-[10px] font-semibold uppercase tracking-wide text-red-600 tabular-nums">
-                  বাকি {fmt(due)}
+                <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-red-50 text-red-600 border border-red-100 text-xs font-medium whitespace-nowrap">
+                  <Wallet className="w-3 h-3" />৳{due.toLocaleString()}
+                </span>
+              )}
+              {delivered && (
+                <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-blue-50 text-blue-600 border border-blue-100 text-[10px] font-semibold">
+                  <PackageCheck className="w-3 h-3" />
+                  <span className="hidden sm:inline">Delivered</span>
                 </span>
               )}
             </div>
           </div>
-        </div>
 
-        {/* Created-by / timestamp strip — kept plain, always visible (glanceable, unlike the action buttons) */}
-        <div className="mx-4 mb-3 px-3 py-2 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-between gap-2 text-[11px]">
-          <span className="flex items-center gap-1.5 text-slate-500 min-w-0">
-            <UserCheck className="w-3.5 h-3.5 shrink-0 text-slate-400" />
-            <span className="truncate">{creatorName || "—"}</span>
-          </span>
-          <span className="flex items-center gap-1.5 text-slate-500 shrink-0">
-            <Clock className="w-3.5 h-3.5 text-slate-400" />
-            {date} · {time}
-          </span>
-        </div>
-
-        {/* Actions tray — collapsed by default, expands on click; hidden on print */}
-        <div className="px-4 pb-4 no-print">
-          {actionsOpen ? (
-            <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
-              <ActionChip onClick={() => setViewingDetails(true)} icon={Eye} label="Details" />
-              <ActionLinkChip to={`/outdoor/invoice/print/${invoice.invoiceId}`} icon={FileText} label="Invoice" />
+          {/* Actions */}
+          <div className="px-3 pb-3">
+            <div className="flex items-center gap-1.5 flex-wrap justify-start">
+              <ActionChip
+                onClick={() => setViewingDetails(true)}
+                icon={Eye}
+                label="Details"
+                className="text-violet-700 bg-violet-50 hover:bg-violet-100 border-violet-100"
+              />
+              <ActionLinkChip
+                to={`/outdoor/invoice/print/${invoice.invoiceId}`}
+                icon={FileText}
+                label="Invoice"
+                className="text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border-indigo-100"
+              />
               {hasReports && (
                 <ActionLinkChip
                   to="/report"
                   state={{ invoiceId: invoice.invoiceId }}
                   icon={FlaskConical}
                   label="Reports"
-                  tone="red"
+                  className="text-white bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 border-transparent shadow-sm"
                 />
               )}
-              <ActionChip onClick={() => setEditingPatient(true)} icon={Pencil} label="Edit" />
+              <ActionChip
+                onClick={() => setEditingPatient(true)}
+                icon={Pencil}
+                label="Edit"
+                className="text-gray-600 bg-gray-100 hover:bg-gray-200 border-gray-200"
+              />
               {!fullyPaid && (
-                <ActionChip onClick={() => setCollectingDue(true)} icon={CreditCard} label="Collect Due" tone="green" />
+                <ActionChip
+                  onClick={() => setCollectingDue(true)}
+                  icon={CreditCard}
+                  label="Collect"
+                  className="text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border-emerald-200"
+                />
               )}
               {!delivered && (
-                <ActionChip onClick={() => setConfirming(true)} icon={PackageCheck} label="Delivery" tone="blue" />
+                <ActionChip
+                  onClick={() => setConfirming(true)}
+                  icon={PackageCheck}
+                  label="Deliver"
+                  className="text-blue-700 bg-blue-50 hover:bg-blue-100 border-blue-100"
+                />
               )}
-              <button
-                onClick={() => setActionsOpen(false)}
-                className="shrink-0 ml-auto w-8 h-8 flex items-center justify-center rounded-lg border border-slate-200 text-slate-400 hover:text-slate-900 hover:bg-slate-50 transition-colors"
-                aria-label="Hide actions"
-              >
-                <ChevronUp className="w-3.5 h-3.5" />
-              </button>
             </div>
-          ) : (
-            <button
-              onClick={() => setActionsOpen(true)}
-              className="w-full flex items-center justify-center gap-1.5 py-2 text-xs font-medium text-slate-500 border border-dashed border-slate-200 hover:border-slate-300 hover:bg-slate-50 rounded-xl transition-colors"
-            >
-              <MoreHorizontal className="w-3.5 h-3.5" /> অ্যাকশন দেখুন
-            </button>
-          )}
+          </div>
         </div>
       </div>
     </>
   );
 };
-
-// ─── Action chips ──────────────────────────────────────────────────────────────
-
-const chipToneClasses = {
-  default: "border-slate-200 text-slate-600 hover:bg-slate-50",
-  green: "border-emerald-200 text-emerald-600 hover:bg-emerald-50",
-  blue: "border-blue-200 text-blue-600 hover:bg-blue-50",
-  red: "border-red-200 text-red-600 hover:bg-red-50",
-};
-
-const ActionChip = ({ onClick, icon: Icon, label, tone = "default" }) => (
-  <button
-    onClick={onClick}
-    className={`shrink-0 inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium border rounded-lg transition-colors whitespace-nowrap ${chipToneClasses[tone]}`}
-  >
-    <Icon className="w-3.5 h-3.5" />
-    {label}
-  </button>
-);
-
-const ActionLinkChip = ({ to, state, icon: Icon, label, tone = "default" }) => (
-  <Link
-    to={to}
-    state={state}
-    className={`shrink-0 inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium border rounded-lg transition-colors whitespace-nowrap ${chipToneClasses[tone]}`}
-  >
-    <Icon className="w-3.5 h-3.5" />
-    {label}
-  </Link>
-);
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
@@ -960,8 +967,8 @@ export const InvoiceDetailsModal = ({
               <div className="grid grid-cols-2 gap-x-4 gap-y-3">
                 <ManifestField label="Name" value={patient.name} />
                 <ManifestField label="Gender" value={<span className="capitalize">{patient.gender}</span>} />
-                <ManifestField label="Age" value={`${patient.age} yrs`} />
-                <ManifestField label="Contact" value={patient.contactNumber} />
+                <ManifestField label="Age" value={formatAge(patient.age)} />
+                <ManifestField label="Contact" value={patient.contactNumber || "—"} />
               </div>
             </ManifestBlock>
 
@@ -974,7 +981,7 @@ export const InvoiceDetailsModal = ({
 
             {/* Referrer */}
             {hasReferrer && (
-              <ManifestBlock icon={User} label="মিডিয়া">
+              <ManifestBlock icon={User} label="মিডিয়া">
                 <div className="grid grid-cols-2 gap-x-4 gap-y-3">
                   <ManifestField label="Name" value={referrer.name || "—"} />
                   {referrer.type && (
@@ -1145,25 +1152,58 @@ export const InvoiceDetailsModal = ({
 };
 
 // ─── Edit Patient Modal ───────────────────────────────────────────────────────
+//
+// Patient age is stored server-side as { years, months, days } (see
+// invoiceRoutes.js patientAgeSchema), NOT a single number — this modal now
+// exposes three separate fields instead of one "Age" input, and requires at
+// least one part to be non-zero (enforced client-side, matching the
+// backend's schema comment: "None of the three parts is individually
+// required server-side — any that are omitted default to 0").
+//
+// Contact number must be exactly 11 digits (standard BD mobile number
+// length). Input strips non-digit characters and hard-caps length as the
+// user types; submit is blocked until the value matches exactly.
 
 export const EditPatientModal = ({ invoice, isOpen, onClose, onSaved, onLoadingChange, onError, onNetworkError }) => {
-  const [form, setForm] = useState({ name: "", gender: "", age: "", contactNumber: "" });
+  const [form, setForm] = useState({ name: "", gender: "", years: "", months: "", days: "", contactNumber: "" });
 
   useEffect(() => {
     if (!invoice?.patient) return;
     const { name, gender, age, contactNumber } = invoice.patient;
-    setForm({ name: name || "", gender: gender || "", age: age || "", contactNumber: contactNumber || "" });
+    setForm({
+      name: name || "",
+      gender: gender || "",
+      years: age?.years ? String(age.years) : "",
+      months: age?.months ? String(age.months) : "",
+      days: age?.days ? String(age.days) : "",
+      contactNumber: contactNumber || "",
+    });
   }, [invoice]);
 
-  const isValid = form.name.trim() && form.gender && form.age && form.contactNumber.trim();
+  const hasAge = Number(form.years) > 0 || Number(form.months) > 0 || Number(form.days) > 0;
+  const phoneValid = isValidPhone(form.contactNumber);
+  const isValid = form.name.trim() && form.gender && hasAge && phoneValid;
 
   const handleSubmit = async () => {
     if (!isValid) return;
     onClose();
+
+    const age = {
+      years: Number(form.years) || 0,
+      months: Number(form.months) || 0,
+      days: Number(form.days) || 0,
+    };
+    const patient = {
+      name: form.name.trim(),
+      gender: form.gender,
+      age,
+      contactNumber: form.contactNumber.trim(),
+    };
+
     try {
       onLoadingChange("Updating patient info...");
-      await invoiceService.updatePatientInfo(invoice.invoiceId, { patient: form });
-      onSaved(invoice.invoiceId, { patient: { ...form, age: Number(form.age) } });
+      await invoiceService.updatePatientInfo(invoice.invoiceId, { patient });
+      onSaved(invoice.invoiceId, { patient });
     } catch (err) {
       if (isNetworkError(err)) {
         onNetworkError?.();
@@ -1179,6 +1219,21 @@ export const EditPatientModal = ({ invoice, isOpen, onClose, onSaved, onLoadingC
   const inputCls =
     "w-full pl-10 pr-3 py-3 text-base border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all bg-slate-50 focus:bg-white";
   const set = (field) => (e) => setForm((p) => ({ ...p, [field]: e.target.value }));
+
+  // Clamps a numeric age-part field to [0, max] as the user types, allowing
+  // an empty string mid-edit rather than snapping to 0.
+  const setAgePart = (field, max) => (e) => {
+    const raw = e.target.value;
+    if (raw === "") return setForm((p) => ({ ...p, [field]: "" }));
+    const num = Math.min(max, Math.max(0, parseInt(raw, 10) || 0));
+    setForm((p) => ({ ...p, [field]: String(num) }));
+  };
+
+  // Strips non-digits and hard-caps at PHONE_LENGTH characters as the user types.
+  const setPhone = (e) => {
+    const digits = e.target.value.replace(/\D/g, "").slice(0, PHONE_LENGTH);
+    setForm((p) => ({ ...p, contactNumber: digits }));
+  };
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} size="sm">
@@ -1232,34 +1287,47 @@ export const EditPatientModal = ({ invoice, isOpen, onClose, onSaved, onLoadingC
           </div>
         </EditField>
 
-        <div className="grid grid-cols-2 gap-3">
-          <EditField label="Age" required>
-            <IconWrap icon={Calendar}>
-              <input
-                type="number"
-                inputMode="numeric"
-                value={form.age}
-                onChange={set("age")}
-                className={inputCls}
-                placeholder="e.g. 32"
-                min="0"
-                max="150"
-              />
-            </IconWrap>
-          </EditField>
-          <EditField label="Contact" required>
-            <IconWrap icon={Phone}>
-              <input
-                type="tel"
-                inputMode="tel"
-                value={form.contactNumber}
-                onChange={set("contactNumber")}
-                className={inputCls}
-                placeholder="01XXXXXXXXX"
-              />
-            </IconWrap>
-          </EditField>
-        </div>
+        <EditField label="Age" required>
+          <div className="grid grid-cols-3 gap-2">
+            {[
+              { field: "years", max: 150, label: "Years" },
+              { field: "months", max: 11, label: "Months" },
+              { field: "days", max: 31, label: "Days" },
+            ].map(({ field, max, label }) => (
+              <div key={field}>
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  value={form[field]}
+                  onChange={setAgePart(field, max)}
+                  min="0"
+                  max={max}
+                  placeholder={label}
+                  className="w-full px-2 py-3 text-base text-center border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all bg-slate-50 focus:bg-white"
+                />
+                <span className="block text-center text-[10px] text-slate-400 mt-1">{label}</span>
+              </div>
+            ))}
+          </div>
+          {!hasAge && <p className="mt-1.5 text-[11px] text-red-500">অন্তত একটি বয়স অংশ পূরণ করুন</p>}
+        </EditField>
+
+        <EditField label="Contact" required>
+          <IconWrap icon={Phone}>
+            <input
+              type="tel"
+              inputMode="numeric"
+              value={form.contactNumber}
+              onChange={setPhone}
+              className={inputCls}
+              placeholder="01XXXXXXXXX"
+              maxLength={PHONE_LENGTH}
+            />
+          </IconWrap>
+          {form.contactNumber && !phoneValid && (
+            <p className="mt-1.5 text-[11px] text-red-500">মোবাইল নম্বর অবশ্যই {PHONE_LENGTH} ডিজিটের হতে হবে</p>
+          )}
+        </EditField>
       </div>
 
       <div className="flex gap-2 px-5 pb-5 pt-1">

@@ -47,13 +47,13 @@ const PAYMENT_MODES = [
 ];
 
 const INITIAL_FORM = {
-  patient: { name: "", gender: "", age: "", contactNumber: "" },
-  // The doctor associated with this invoice — independent of `referredBy`.
-  // Object (selected from availableDoctors) | string (typed, unmatched) | null.
+  patient: {
+    name: "",
+    gender: "",
+    age: { years: "", months: "", days: "" },
+    contactNumber: "",
+  },
   doctor: null,
-  // When true, `doctor` stands in for `referredBy` on submission (id/name,
-  // type "doctor") and drives the referrer-discount/commission math off the
-  // doctor's own commissionType/commissionValue instead of `referredBy`'s.
   useDoctorAsReferrer: false,
   referredBy: null,
   selectedTests: [],
@@ -64,9 +64,6 @@ const INITIAL_FORM = {
   labAdjustmentAmount: 0,
   paidAmount: "",
   paymentMode: "cash",
-  // Off by default. If the lab has forceInvoiceFee set, computeAmount()
-  // applies the fee regardless of this flag — this only matters for the
-  // manual toggle case. See "Online Invoice Fee" below.
   onlineFeeEnabled: false,
   onlineFeePaidBy: "lab",
 };
@@ -80,12 +77,45 @@ const toFixed2 = (n) => parseFloat(n.toFixed(2));
 
 const paymentModeLabel = (value) => PAYMENT_MODES.find((m) => m.value === value)?.label ?? value;
 
-// Punctuation/spacing-insensitive match key. Strips everything except
-// letters and digits and lowercases, so "S. GPT", "S-GPT", "S GPT" and
-// "SGPT" all collapse to the same key ("sgpt"). Used for search/filter
-// matching only — never for display, storage, or the `key` prop, which
-// keep the original name untouched.
 const normalize = (s) => (s || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+
+// ── Age helpers ──────────────────────────────────────────────────────────────
+// Age is collected as three parts (years / months / days) and combined into
+// a single compact string for display and for the payload sent to the
+// backend — e.g. { years: 24, months: 5, days: 10 } -> "24yrs 5mo 10d".
+// Any part that is blank/zero is simply left out; if every part is blank the
+// result is "" (used to gate the "Age is required" validation).
+const parseAgePart = (v) => {
+  if (v === "" || v === null || v === undefined) return 0;
+  const n = parseInt(v, 10);
+  return Number.isFinite(n) && n >= 0 ? n : 0;
+};
+
+const normalizeAge = (age) => ({
+  years: parseAgePart(age?.years),
+  months: parseAgePart(age?.months),
+  days: parseAgePart(age?.days),
+});
+
+const formatAge = (age) => {
+  if (!age) return "";
+  const { years, months, days } = normalizeAge(age);
+  const parts = [];
+  if (years > 0) parts.push(`${years}yrs`);
+  if (months > 0) parts.push(`${months}mo`);
+  if (days > 0) parts.push(`${days}d`);
+  if (parts.length === 0) {
+    return age?.years === "" || age?.years === undefined ? "" : "0yrs";
+  }
+  return parts.join(" ");
+};
+
+// Whether enough of the age has been entered to satisfy the "required" rule.
+// FIX: previously only checked `years`, so entering just Months or just Days
+// (leaving Years blank) still failed with "Age is required". Now valid if
+// ANY of the three parts has been typed into.
+const isAgeFilled = (age) =>
+  [age?.years, age?.months, age?.days].some((v) => v !== "" && v !== null && v !== undefined);
 
 // ── Error helpers ────────────────────────────────────────────────────────────
 
@@ -96,7 +126,6 @@ const getErrorMessage = (err, fallback) => {
   return err?.response?.data?.error ?? fallback;
 };
 
-// ── Axios‑native network error detection (same as all other pages) ──────────
 const isNetworkError = (err) => err?.isAxiosError === true && !err.response;
 
 const calcReferrerDiscount = ({ referrer, hasReferrerDiscount, referrerDiscount, initial }) => {
@@ -116,11 +145,6 @@ const calcReferrerCommission = (referrer, initial, referrerDiscountAmt) => {
   return Math.max(0, toFixed2(gross - referrerDiscountAmt));
 };
 
-// Online invoice fee: driven purely by the lab's billing config, not by
-// whether any selected test happens to carry a schemaId.
-//   - forceInvoiceFee: true  -> fee always applied, no toggle shown
-//   - forceInvoiceFee: false -> fee off by default; user can flip
-//     form.onlineFeeEnabled via the toggle to apply it manually
 const computeAmount = (form, feeConfig = {}) => {
   const { feePerInvoice = 0, forceInvoiceFee = false } = feeConfig;
 
@@ -128,10 +152,6 @@ const computeAmount = (form, feeConfig = {}) => {
   const productsTotal = form.selectedProducts.reduce((s, p) => s + (p.price || 0) * (p.quantity || 1), 0);
   const initial = testsTotal + productsTotal;
 
-  // When "use doctor as referrer" is on, the doctor's own commission fields
-  // (from the doctors collection — same commissionType/commissionValue shape
-  // as a referrer) drive the discount/commission math instead of whatever's
-  // in the separate Referred By field.
   const effectiveReferrer = form.useDoctorAsReferrer ? form.doctor : form.referredBy;
 
   const referrerDiscount = calcReferrerDiscount({
@@ -182,12 +202,6 @@ const Field = ({ label, required, optional, children }) => (
   </div>
 );
 
-// Wheel-blur guard: number inputs otherwise respond to mouse-wheel /
-// trackpad scroll while focused, silently incrementing or decrementing
-// the value (age, discount %, lab adjustment, paid amount, etc.) — this
-// blurs the input the moment a wheel event fires so a scroll never
-// touches its value. Non-number inputs (name, contact number) are
-// untouched, and any caller-supplied onWheel still passes through.
 const blurOnWheel = (e) => e.currentTarget.blur();
 
 const IconInput = ({ icon: Icon, className = "", ...props }) => (
@@ -201,6 +215,49 @@ const IconInput = ({ icon: Icon, className = "", ...props }) => (
     />
   </div>
 );
+
+const AgePartInput = ({ value, onChange, max, placeholder }) => (
+  <input
+    type="number"
+    inputMode="numeric"
+    value={value}
+    onChange={(e) => onChange(e.target.value)}
+    onWheel={blurOnWheel}
+    min="0"
+    max={max}
+    placeholder={placeholder}
+    className="w-full text-center py-2.5 px-2 border border-gray-300 rounded-lg text-sm
+      focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+  />
+);
+
+const AgeInputGroup = ({ age, onAgeChange }) => {
+  const preview = formatAge(age);
+  return (
+    <div>
+      <div className="grid grid-cols-3 gap-2">
+        <div>
+          <AgePartInput value={age.years} onChange={(v) => onAgeChange("years", v)} max={150} placeholder="Years" />
+          <p className="text-[10px] text-gray-400 text-center mt-1">Years</p>
+        </div>
+        <div>
+          <AgePartInput value={age.months} onChange={(v) => onAgeChange("months", v)} max={11} placeholder="Months" />
+          <p className="text-[10px] text-gray-400 text-center mt-1">Months</p>
+        </div>
+        <div>
+          <AgePartInput value={age.days} onChange={(v) => onAgeChange("days", v)} max={31} placeholder="Days" />
+          <p className="text-[10px] text-gray-400 text-center mt-1">Days</p>
+        </div>
+      </div>
+      {preview && (
+        <p className="mt-1.5 text-xs font-medium text-blue-600 flex items-center gap-1">
+          <Calendar className="w-3 h-3" />
+          {preview}
+        </p>
+      )}
+    </div>
+  );
+};
 
 const SectionCard = ({ icon: Icon, title, children }) => (
   <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
@@ -322,7 +379,6 @@ const InvoiceSummary = ({ formData, amount, onConfirm, onClose }) => {
 
   return (
     <div className="bg-white rounded-2xl max-h-[90vh] overflow-hidden flex flex-col shadow-xl">
-      {/* Header */}
       <div className="px-8 py-6 border-b border-gray-100 flex items-center gap-3">
         <div className="p-2.5 bg-blue-50 rounded-xl">
           <Receipt className="w-5 h-5 text-blue-600" />
@@ -334,12 +390,11 @@ const InvoiceSummary = ({ formData, amount, onConfirm, onClose }) => {
       </div>
 
       <div className="flex-1 overflow-y-auto px-8 py-6 space-y-5">
-        {/* Patient */}
         <SummaryBlock icon={UserCircle} title="Patient Details">
           <div className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
             <Detail label="Full Name" value={patient.name} />
             <Detail label="Gender" value={<span className="capitalize">{patient.gender}</span>} />
-            <Detail label="Age" value={`${patient.age} years`} />
+            <Detail label="Age" value={formatAge(patient.age) || "—"} />
             <Detail label="Contact" value={patient.contactNumber || "—"} />
             {doctor && (
               <div className="col-span-2">
@@ -370,7 +425,6 @@ const InvoiceSummary = ({ formData, amount, onConfirm, onClose }) => {
           </div>
         </SummaryBlock>
 
-        {/* Tests */}
         {selectedTests.length > 0 && (
           <SummaryBlock
             icon={FileText}
@@ -388,7 +442,6 @@ const InvoiceSummary = ({ formData, amount, onConfirm, onClose }) => {
           </SummaryBlock>
         )}
 
-        {/* Products */}
         {selectedProducts.length > 0 && (
           <SummaryBlock
             icon={Package}
@@ -410,7 +463,6 @@ const InvoiceSummary = ({ formData, amount, onConfirm, onClose }) => {
           </SummaryBlock>
         )}
 
-        {/* Payment */}
         <SummaryBlock icon={DollarSign} title="Payment Summary">
           <div className="space-y-2 text-sm">
             <AmountRow label="Subtotal" value={fmt(amount.initial)} />
@@ -516,6 +568,7 @@ const InvoiceForm = ({
   availableDoctors,
   onChange,
   onPatientChange,
+  onAgeChange,
   onTestToggle,
   onProductToggle,
   onProductQtyChange,
@@ -531,8 +584,6 @@ const InvoiceForm = ({
   const [showItemDrop, setShowItemDrop] = useState(false);
   const itemDropRef = useRef(null);
 
-  // ── Keyboard navigation state ──────────────────────────────────────────
-  // -1 means "nothing highlighted" (input itself is effectively focused).
   const [referrerActiveIndex, setReferrerActiveIndex] = useState(-1);
   const [doctorActiveIndex, setDoctorActiveIndex] = useState(-1);
   const [itemActiveIndex, setItemActiveIndex] = useState(-1);
@@ -556,13 +607,9 @@ const InvoiceForm = ({
     onlineFeeEnabled,
   } = formData;
 
-  // Drives both the discount/commission math (via `amount`, computed
-  // upstream) and the "Apply Discount" UI below — whichever of doctor /
-  // referredBy is currently in effect as the referrer.
   const effectiveReferrer = useDoctorAsReferrer ? doctor : referredBy;
   const due = Math.max(0, amount.final - amount.paid);
 
-  // Close item dropdown on outside click
   useEffect(() => {
     const handler = (e) => {
       if (itemDropRef.current && !itemDropRef.current.contains(e.target)) setShowItemDrop(false);
@@ -571,18 +618,11 @@ const InvoiceForm = ({
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
-  // Combined filtered results. Matching is punctuation/spacing-insensitive
-  // (via `normalize`) so "S. GPT", "S-GPT", "S GPT" and "SGPT" all match
-  // each other regardless of how the query or the stored name is typed.
   const q = normalize(itemQuery);
   const filteredTests = q ? availableTests.filter((t) => normalize(t.name).includes(q)) : availableTests;
   const filteredProducts = q ? availableProducts.filter((p) => normalize(p.name).includes(q)) : availableProducts;
   const hasResults = filteredTests.length > 0 || filteredProducts.length > 0;
 
-  // Flat list mirroring render order (tests, then products) so arrow-key
-  // index maps 1:1 onto what's on screen. Out-of-stock products stay in
-  // the list (so they can still be scrolled past / skipped) but are
-  // marked selectable: false — Enter is a no-op on them, same as a click.
   const itemFlatList = [
     ...filteredTests.map((t) => ({ kind: "test", data: t, selectable: true })),
     ...filteredProducts.map((p) => ({
@@ -600,8 +640,6 @@ const InvoiceForm = ({
     ? availableDoctors.filter((d) => normalize(d.name).includes(normalize(doctorQuery)))
     : availableDoctors;
 
-  // Reset highlight whenever the underlying list changes (new query, drop
-  // opened/closed) so a stale index doesn't point at the wrong row.
   useEffect(() => {
     setReferrerActiveIndex(-1);
   }, [referrerQuery, showReferrerDrop, useDoctorAsReferrer]);
@@ -614,7 +652,6 @@ const InvoiceForm = ({
     setItemActiveIndex(-1);
   }, [itemQuery, showItemDrop]);
 
-  // Keep the highlighted row scrolled into view as it moves via keyboard.
   const scrollActiveIntoView = (refsArr, index) => {
     const el = refsArr.current[index];
     if (el) el.scrollIntoView({ block: "nearest" });
@@ -643,7 +680,6 @@ const InvoiceForm = ({
     setItemActiveIndex(-1);
   };
 
-  // Generic arrow/enter/escape handler shared by the three search inputs.
   const handleDropdownKeyDown = (e, { isOpen, list, activeIndex, setActiveIndex, onSelect, refsArr, closeDrop }) => {
     if (!isOpen || list.length === 0) return;
 
@@ -662,9 +698,6 @@ const InvoiceForm = ({
         e.preventDefault();
         onSelect(list[activeIndex]);
       }
-      // If nothing is highlighted, let Enter fall through (e.g. the
-      // referrer/doctor onBlur-style "use typed name" behavior still
-      // works since the input itself handles that on blur, not here).
     } else if (e.key === "Escape") {
       setActiveIndex(-1);
       closeDrop();
@@ -694,10 +727,6 @@ const InvoiceForm = ({
     onChange("referrerDiscount", checked ? effectiveReferrer?.commissionValue || 0 : 0);
   };
 
-  // Lab adjustment is gated by canAdjustLab (hidden entirely if a staff has
-  // a zero cap) and bounded by both the staff's max (from JWT) and the
-  // invoice total after Media discount - admins skip the dollar cap but
-  // are still bounded by the post-discount total.
   const labAdjustmentCap = isAdmin
     ? amount.afterReferrerDiscount
     : Math.min(maxLabAdjustment, amount.afterReferrerDiscount);
@@ -723,7 +752,6 @@ const InvoiceForm = ({
 
   return (
     <form onSubmit={onSubmit} className="space-y-6">
-      {/* ── Patient Information ─────────────────────────────────── */}
       <SectionCard icon={UserCircle} title="Patient Information">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
           <Field label="Patient Name" required>
@@ -737,16 +765,7 @@ const InvoiceForm = ({
           </Field>
 
           <Field label="Age" required>
-            <IconInput
-              icon={Calendar}
-              type="number"
-              value={patient.age}
-              onChange={(e) => onPatientChange("age", e.target.value)}
-              placeholder="Enter age"
-              min="0"
-              max="150"
-              required
-            />
+            <AgeInputGroup age={patient.age} onAgeChange={onAgeChange} />
           </Field>
 
           <Field label="Contact Number" optional>
@@ -786,7 +805,6 @@ const InvoiceForm = ({
             </div>
           </Field>
 
-          {/* ── Doctor field — independent of Referred By below ─────── */}
           <div className="md:col-span-2">
             <Field label="Doctor" optional>
               <div className="relative">
@@ -817,10 +835,6 @@ const InvoiceForm = ({
                       })
                     }
                     onBlur={() => {
-                      // NOTE: typeof null === "object" in JS, so `doctor` being
-                      // its initial `null` value must be checked explicitly —
-                      // relying on `typeof doctor !== "object"` alone silently
-                      // drops typed-but-unregistered doctor names.
                       if (doctorQuery.trim() && (doctor === null || typeof doctor === "string"))
                         onChange("doctor", doctorQuery.trim());
                       setShowDoctorDrop(false);
@@ -930,9 +944,6 @@ const InvoiceForm = ({
                       })
                     }
                     onBlur={() => {
-                      // Same null-vs-"object" gotcha as the Doctor field above —
-                      // `referredBy` starts as `null`, and `typeof null` is
-                      // "object", so it must be checked for explicitly.
                       if (referrerQuery.trim() && (referredBy === null || typeof referredBy === "string"))
                         onChange("referredBy", referrerQuery.trim());
                       setShowReferrerDrop(false);
@@ -1020,9 +1031,7 @@ const InvoiceForm = ({
         </div>
       </SectionCard>
 
-      {/* ── Tests & Products ────────────────────────────────────── */}
       <SectionCard icon={FileText} title="Tests & Products">
-        {/* Combined search */}
         <div className="relative mb-5" ref={itemDropRef}>
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
@@ -1054,7 +1063,6 @@ const InvoiceForm = ({
             <div className="absolute top-full mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-72 overflow-y-auto z-20">
               {hasResults ? (
                 <>
-                  {/* Tests group */}
                   {filteredTests.length > 0 && (
                     <>
                       <div className="px-4 py-2 bg-gray-50 border-b border-gray-100 sticky top-0">
@@ -1094,14 +1102,13 @@ const InvoiceForm = ({
                     </>
                   )}
 
-                  {/* Products group */}
                   {filteredProducts.length > 0 && (
                     <>
                       <div className="px-4 py-2 bg-gray-50 border-b border-gray-100 sticky top-0">
                         <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Products</span>
                       </div>
                       {filteredProducts.map((product, pIdx) => {
-                        const idx = filteredTests.length + pIdx; // offset into the flat list
+                        const idx = filteredTests.length + pIdx;
                         const selected = selectedProducts.some((p) => p._id === product._id);
                         const outOfStock = product.hasStock && product.stock === 0;
                         const active = idx === itemActiveIndex;
@@ -1157,7 +1164,6 @@ const InvoiceForm = ({
           )}
         </div>
 
-        {/* Selected Tests */}
         {selectedTests.length > 0 && (
           <div className="mb-4">
             <div className="flex items-center justify-between mb-3">
@@ -1192,7 +1198,6 @@ const InvoiceForm = ({
           </div>
         )}
 
-        {/* Selected Products */}
         {selectedProducts.length > 0 && (
           <div className="mb-4">
             <div className="flex items-center justify-between mb-3">
@@ -1243,7 +1248,6 @@ const InvoiceForm = ({
           </div>
         )}
 
-        {/* Empty state */}
         {selectedTests.length === 0 && selectedProducts.length === 0 && (
           <div className="text-center py-12 bg-gray-50 rounded-lg border border-dashed border-gray-300">
             <div className="inline-flex items-center justify-center w-12 h-12 bg-white rounded-full shadow-sm mb-3">
@@ -1255,7 +1259,6 @@ const InvoiceForm = ({
         )}
       </SectionCard>
 
-      {/* ── Pricing & Adjustments ───────────────────────────────── */}
       <SectionCard icon={DollarSign} title="Pricing & Adjustments">
         <div className="space-y-5">
           <div className="p-4 bg-gray-50 rounded-lg flex items-center justify-between">
@@ -1263,7 +1266,6 @@ const InvoiceForm = ({
             <span className="text-xl font-semibold text-gray-900">{fmt(amount.initial)}</span>
           </div>
 
-          {/* Referrer / Doctor Discount */}
           {effectiveReferrer && typeof effectiveReferrer === "object" && (
             <div className="space-y-3">
               <ToggleSwitch
@@ -1307,9 +1309,6 @@ const InvoiceForm = ({
             </div>
           )}
 
-          {/* Lab Adjustment — hidden entirely for staff with a zero cap;
-              admins always see it with no dollar cap (still bounded by the
-              post-referrer-discount total via labAdjustmentCap) */}
           {canAdjustLab && (
             <div className="space-y-3">
               <ToggleSwitch
@@ -1346,12 +1345,6 @@ const InvoiceForm = ({
             </div>
           )}
 
-          {/* Online Invoice Fee — shown whenever the lab has a fee configured
-              (feePerInvoice > 0), regardless of what's in the cart.
-              If forceInvoiceFee is on, it's mandatory (no toggle, always
-              applied). Otherwise it's off by default and the staff can turn
-              it on manually via the toggle. Always added on top of the
-              patient's total. */}
           {feePerInvoice > 0 && (
             <div className="space-y-2">
               {forceInvoiceFee ? (
@@ -1376,7 +1369,6 @@ const InvoiceForm = ({
             </div>
           )}
 
-          {/* Final total */}
           <div className="p-5 bg-blue-600 rounded-lg flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Sparkles className="w-4 h-4 text-white" />
@@ -1385,7 +1377,6 @@ const InvoiceForm = ({
             <span className="text-2xl font-bold text-white">{fmt(amount.final)}</span>
           </div>
 
-          {/* Paid Amount */}
           <div className="space-y-3">
             <div className="flex items-center gap-2">
               <div className="p-1.5 bg-green-50 rounded">
@@ -1404,7 +1395,6 @@ const InvoiceForm = ({
               className="focus:ring-green-500/20 focus:border-green-500"
             />
 
-            {/* Payment Mode */}
             <PaymentModeSelector value={paymentMode} onChange={(val) => onChange("paymentMode", val)} />
 
             {amount.final > 0 && (
@@ -1472,7 +1462,6 @@ const CreateInvoice = () => {
   const user = useAuthStore((s) => s.user);
   const lab = useAuthStore((s) => s.lab);
 
-  // Permission check
   const isAdmin = user?.role === "admin";
   const hasAccess = isAdmin || user?.permissions?.createInvoice === true;
   if (!hasAccess) {
@@ -1500,7 +1489,6 @@ const CreateInvoice = () => {
 
   const amount = computeAmount(formData, { feePerInvoice, forceInvoiceFee });
 
-  // Fetch initial data with network error detection
   useEffect(() => {
     Promise.all([invoiceService.getRequiredData(), invoiceService.getDoctors()])
       .then(([reqRes, docRes]) => {
@@ -1527,8 +1515,6 @@ const CreateInvoice = () => {
         next.referrerDiscount = 0;
       }
       if (field === "doctor" && prev.useDoctorAsReferrer) {
-        // Doctor changed while it was powering the Media discount — the
-        // old discount amount no longer matches the new doctor's commission.
         next.hasReferrerDiscount = false;
         next.referrerDiscount = 0;
       }
@@ -1542,6 +1528,13 @@ const CreateInvoice = () => {
 
   const handlePatientChange = (field, value) => {
     setFormData((prev) => ({ ...prev, patient: { ...prev.patient, [field]: value } }));
+  };
+
+  const handleAgeChange = (part, value) => {
+    setFormData((prev) => ({
+      ...prev,
+      patient: { ...prev.patient, age: { ...prev.patient.age, [part]: value } },
+    }));
   };
 
   const handleTestToggle = (test) => {
@@ -1579,7 +1572,7 @@ const CreateInvoice = () => {
     const { patient, selectedTests, selectedProducts } = formData;
     if (!patient.name?.trim()) return setPopup({ type: "error", message: "Patient name is required" });
     if (!patient.gender) return setPopup({ type: "error", message: "Gender is required" });
-    if (!patient.age) return setPopup({ type: "error", message: "Age is required" });
+    if (!isAgeFilled(patient.age)) return setPopup({ type: "error", message: "Age is required" });
     if (!selectedTests.length && !selectedProducts.length)
       return setPopup({ type: "error", message: "Please select at least one test or product" });
     setShowSummary(true);
@@ -1591,11 +1584,6 @@ const CreateInvoice = () => {
       const { patient, referredBy, doctor, useDoctorAsReferrer, selectedTests, selectedProducts, paymentMode } =
         formData;
 
-      // When "use doctor as referrer" is on, the doctor stands in for the
-      // Referred By field entirely — its id/name (and commission math,
-      // already folded into `amount` by computeAmount) drive the referrer
-      // side of the invoice. The separate `doctor` object below is always
-      // sent regardless of this toggle.
       const effectiveReferrer = useDoctorAsReferrer ? doctor : referredBy;
 
       const referrer = {
@@ -1615,10 +1603,6 @@ const CreateInvoice = () => {
             : null,
       };
 
-      // Doctor field is independent of the Referred By field above. When the
-      // doctor was picked from the list, send its id/name/degree. When the
-      // staff typed a name that didn't match anyone (unregistered doctor),
-      // send only the plain name — id and degree stay null.
       const doctorPayload = doctor
         ? {
             id: typeof doctor === "object" ? (doctor._id ?? null) : null,
@@ -1628,7 +1612,11 @@ const CreateInvoice = () => {
         : { id: null, name: null, degree: null };
 
       const invoiceData = {
-        patient: { ...patient, contactNumber: patient.contactNumber?.trim() || "" },
+        patient: {
+          ...patient,
+          age: normalizeAge(patient.age),
+          contactNumber: patient.contactNumber?.trim() || "",
+        },
         referrer,
         doctor: doctorPayload,
         tests: selectedTests.map(({ testId, name, price, schemaId, commission }) => ({
@@ -1724,6 +1712,7 @@ const CreateInvoice = () => {
               availableDoctors={availableDoctors}
               onChange={handleChange}
               onPatientChange={handlePatientChange}
+              onAgeChange={handleAgeChange}
               onTestToggle={handleTestToggle}
               onProductToggle={handleProductToggle}
               onProductQtyChange={handleProductQtyChange}
